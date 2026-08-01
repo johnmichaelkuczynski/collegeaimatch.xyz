@@ -1,44 +1,40 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Toaster } from '@/components/ui/toaster';
+import NotFound from '@/pages/not-found';
+import { Shell } from '@/components/layout/Shell';
+
+import Dashboard from '@/pages/Dashboard';
+import CollegeSearch from '@/pages/colleges/CollegeSearch';
+import CollegeDetail from '@/pages/colleges/CollegeDetail';
+import SubjectSearch from '@/pages/subjects/SubjectSearch';
+import ProposalsList from '@/pages/proposals/ProposalsList';
+import ProposalDetail from '@/pages/proposals/ProposalDetail';
 
 const queryClient = new QueryClient();
 
-function Home() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Replit Agent is building...
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Your app will appear here once it's ready.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route component={NotFound} />
-    </Switch>
+    <Shell>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/colleges" component={CollegeSearch} />
+        <Route path="/colleges/:id" component={CollegeDetail} />
+        <Route path="/subjects" component={SubjectSearch} />
+        <Route path="/proposals" component={ProposalsList} />
+        <Route path="/proposals/:id" component={ProposalDetail} />
+        <Route component={NotFound} />
+      </Switch>
+    </Shell>
   );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+        <Router />
+      </WouterRouter>
     </QueryClientProvider>
   );
 }
