@@ -3,20 +3,28 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: College Finder for AI - API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: colleges
+    description: College search and details
+  - name: subjects
+    description: Subject-based college search
+  - name: proposals
+    description: Proposal generation and management
+  - name: dashboard
+    description: Dashboard summary data
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +32,628 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /colleges/search:
+    get:
+      operationId: searchColleges
+      tags: [colleges]
+      summary: Search colleges by filters
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          description: "community_college, lower_tier, technical, vocational, specialty, for_profit, four_year, university"
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string }
+        - name: maxDropoutRate
+          in: query
+          schema: { type: number }
+        - name: minDropoutRate
+          in: query
+          schema: { type: number }
+        - name: maxGraduationYears
+          in: query
+          schema: { type: number }
+        - name: maxDebtPayoffYears
+          in: query
+          schema: { type: number }
+        - name: page
+          in: query
+          schema: { type: number, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: number, default: 20 }
+      responses:
+        "200":
+          description: List of colleges
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollegeSearchResult"
+
+  /colleges/{collegeId}:
+    get:
+      operationId: getCollege
+      tags: [colleges]
+      summary: Get college details
+      parameters:
+        - name: collegeId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: College details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/College"
+        "404":
+          description: College not found
+
+  /colleges/{collegeId}/courses:
+    get:
+      operationId: getCollegeCourses
+      tags: [colleges]
+      summary: Get high-enrollment or AI-candidate courses at a college
+      parameters:
+        - name: collegeId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: subject
+          in: query
+          schema: { type: string }
+          description: Optional subject filter (broad match)
+      responses:
+        "200":
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+
+  /colleges/{collegeId}/contacts:
+    get:
+      operationId: getCollegeContacts
+      tags: [colleges]
+      summary: Get decision-maker contacts at a college
+      parameters:
+        - name: collegeId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+
+  /colleges/{collegeId}/cost-analysis:
+    get:
+      operationId: getCollegeCostAnalysis
+      tags: [colleges]
+      summary: Get cost analysis comparing current vs AI course delivery
+      parameters:
+        - name: collegeId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: courseCount
+          in: query
+          schema: { type: number, default: 5 }
+      responses:
+        "200":
+          description: Cost analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostAnalysis"
+
+  /colleges/{collegeId}/stats:
+    get:
+      operationId: getCollegeStats
+      tags: [colleges]
+      summary: Get college statistics (enrollments, popular majors, fail rates)
+      parameters:
+        - name: collegeId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: College stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollegeStats"
+
+  /subjects/search:
+    get:
+      operationId: searchBySubject
+      tags: [subjects]
+      summary: Find colleges that likely want AI courses for a given subject
+      parameters:
+        - name: subject
+          in: query
+          required: true
+          schema: { type: string }
+        - name: institutionType
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: number, default: 10 }
+      responses:
+        "200":
+          description: Colleges ranked by likelihood of wanting AI course
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubjectSearchResult"
+
+  /proposals:
+    get:
+      operationId: listProposals
+      tags: [proposals]
+      summary: List all saved proposals
+      responses:
+        "200":
+          description: List of proposals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProposalSummary"
+    post:
+      operationId: createProposal
+      tags: [proposals]
+      summary: Save a generated proposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalInput"
+      responses:
+        "201":
+          description: Created proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+
+  /proposals/{proposalId}:
+    get:
+      operationId: getProposal
+      tags: [proposals]
+      summary: Get a saved proposal by ID
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "200":
+          description: Proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+        "404":
+          description: Proposal not found
+    delete:
+      operationId: deleteProposal
+      tags: [proposals]
+      summary: Delete a saved proposal
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: { type: number }
+      responses:
+        "204":
+          description: Deleted
+
+  /proposals/generate:
+    post:
+      operationId: generateProposal
+      tags: [proposals]
+      summary: Generate outreach letter and cost graphs for a college
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateProposalInput"
+      responses:
+        "200":
+          description: Generated proposal content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedProposal"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get summary stats for the dashboard
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    College:
+      type: object
+      required: [id, name, city, state, type, enrollmentSize]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        type:
+          type: string
+          description: "community_college, lower_tier, technical, vocational, specialty, for_profit, four_year, university"
+        enrollmentSize:
+          type: number
+        dropoutRate:
+          type: ["number", "null"]
+          description: Percentage (0-100)
+        graduationRate:
+          type: ["number", "null"]
+          description: Percentage (0-100)
+        avgGraduationYears:
+          type: ["number", "null"]
+        debtPayoffYears:
+          type: ["number", "null"]
+          description: Median years to pay off student debt, null if unlikely
+        tuitionInState:
+          type: ["number", "null"]
+        tuitionOutOfState:
+          type: ["number", "null"]
+        accreditation:
+          type: ["string", "null"]
+        url:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        popularMajors:
+          type: array
+          items:
+            type: string
+        aiOpportunityScore:
+          type: ["number", "null"]
+          description: Score 0-100 indicating how likely this college wants AI courses
+
+    CollegeSearchResult:
+      type: object
+      required: [colleges, total, page, limit]
+      properties:
+        colleges:
+          type: array
+          items:
+            $ref: "#/components/schemas/College"
+        total:
+          type: number
+        page:
+          type: number
+        limit:
+          type: number
+
+    Course:
+      type: object
+      required: [name, subject]
+      properties:
+        name:
+          type: string
+        subject:
+          type: string
+        description:
+          type: ["string", "null"]
+        estimatedEnrollment:
+          type: ["number", "null"]
+        sections:
+          type: ["number", "null"]
+        failRate:
+          type: ["number", "null"]
+          description: Percentage (0-100)
+        estimatedAnnualCost:
+          type: ["number", "null"]
+          description: Current annual cost to the institution in USD
+        aiInstallCost:
+          type: ["number", "null"]
+        aiAnnualCost:
+          type: ["number", "null"]
+        isHighPriority:
+          type: boolean
+          default: false
+
+    Contact:
+      type: object
+      required: [name, title, institution]
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+        institution:
+          type: string
+        department:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        linkedinUrl:
+          type: ["string", "null"]
+        decisionPower:
+          type: string
+          description: "curriculum, budget, ai_strategy, provost"
+
+    CostAnalysis:
+      type: object
+      required: [collegeName, courses, totalCurrentAnnualCost, totalAiInstallCost, totalAiAnnualCost, savingsYear1, savingsAnnual, attritionCost, benchmarkingCost, totalCostWithoutAI, totalCostWithAI]
+      properties:
+        collegeName:
+          type: string
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        totalCurrentAnnualCost:
+          type: number
+        totalAiInstallCost:
+          type: number
+        totalAiAnnualCost:
+          type: number
+        attritionCost:
+          type: number
+          description: Annual cost of student attrition and equity-gap exposure
+        benchmarkingCost:
+          type: number
+          description: Annual cost of internal benchmarking and outcomes verification
+        totalCostWithoutAI:
+          type: number
+          description: Total annual burden without AI courses
+        totalCostWithAI:
+          type: number
+          description: Total annual cost with AI courses (first year)
+        savingsYear1:
+          type: number
+        savingsAnnual:
+          type: number
+          description: Recurring annual savings after year 1
+
+    CollegeStats:
+      type: object
+      required: [collegeName]
+      properties:
+        collegeName:
+          type: string
+        totalEnrollment:
+          type: ["number", "null"]
+        dropoutRate:
+          type: ["number", "null"]
+        graduationRate:
+          type: ["number", "null"]
+        avgTimeToGraduate:
+          type: ["number", "null"]
+        popularMajors:
+          type: array
+          items:
+            type: string
+        highEnrollmentCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        highFailRateCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+
+    SubjectSearchResult:
+      type: object
+      required: [college, subject, opportunityScore, reason]
+      properties:
+        college:
+          $ref: "#/components/schemas/College"
+        subject:
+          type: string
+        opportunityScore:
+          type: number
+          description: Score 0-100 indicating how much this college wants AI courses for this subject
+        reason:
+          type: string
+          description: Explanation of why this college is a good target
+        estimatedEnrollment:
+          type: ["number", "null"]
+        estimatedAnnualCost:
+          type: ["number", "null"]
+
+    ProposalSummary:
+      type: object
+      required: [id, collegeName, collegeState, createdAt]
+      properties:
+        id:
+          type: number
+        collegeName:
+          type: string
+        collegeState:
+          type: string
+        courseCount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Proposal:
+      type: object
+      required: [id, collegeName, collegeState, outreachLetter, costAnalysis, createdAt]
+      properties:
+        id:
+          type: number
+        collegeId:
+          type: ["string", "null"]
+        collegeName:
+          type: string
+        collegeState:
+          type: string
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        aiVirtues:
+          type: array
+          items:
+            type: string
+        outreachLetter:
+          type: string
+        costAnalysis:
+          $ref: "#/components/schemas/CostAnalysis"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProposalInput:
+      type: object
+      required: [collegeName, collegeState, outreachLetter, costAnalysis]
+      properties:
+        collegeId:
+          type: string
+        collegeName:
+          type: string
+        collegeState:
+          type: string
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        aiVirtues:
+          type: array
+          items:
+            type: string
+        outreachLetter:
+          type: string
+        costAnalysis:
+          $ref: "#/components/schemas/CostAnalysis"
+
+    GenerateProposalInput:
+      type: object
+      required: [collegeName, collegeState]
+      properties:
+        collegeId:
+          type: string
+        collegeName:
+          type: string
+        collegeState:
+          type: string
+        collegeType:
+          type: string
+        enrollmentSize:
+          type: number
+        dropoutRate:
+          type: number
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        aiVirtues:
+          type: array
+          items:
+            type: string
+          description: "Features of the AI course (e.g. internal benchmarking, built-in tutor, adaptive pacing)"
+        costAnalysis:
+          $ref: "#/components/schemas/CostAnalysis"
+
+    GeneratedProposal:
+      type: object
+      required: [outreachLetter, costAnalysis, prioritizedCourses]
+      properties:
+        outreachLetter:
+          type: string
+        costAnalysis:
+          $ref: "#/components/schemas/CostAnalysis"
+        prioritizedCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Course"
+        executiveSummary:
+          type: string
+
+    DashboardSummary:
+      type: object
+      required: [totalProposals, totalCollegesResearched, topOpportunityStates, recentProposals]
+      properties:
+        totalProposals:
+          type: number
+        totalCollegesResearched:
+          type: number
+        avgSavingsPerCollege:
+          type: ["number", "null"]
+        topOpportunityStates:
+          type: array
+          items:
+            type: object
+            required: [state, count]
+            properties:
+              state:
+                type: string
+              count:
+                type: number
+        recentProposals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProposalSummary"
+        totalPotentialSavings:
+          type: ["number", "null"]

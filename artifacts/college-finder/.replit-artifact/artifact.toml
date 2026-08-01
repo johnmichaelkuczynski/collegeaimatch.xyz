@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "College Finder for AI"
+description = "A B2B sales intelligence tool for finding colleges that are strong candidates to replace high-enrollment courses with AI-powered alternatives. Features two workflows: College→Subject (browse colleges then find course opportunities) and Subject→College (start from a subject and find target schools). Generates cost-analysis reports, decision-maker contact lists, and outreach proposal letters with charts."
+version = "1.0.0"
+id = "artifacts/college-finder"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18735
+
+[services.development]
+run = "pnpm --filter @workspace/college-finder run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/college-finder", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/college-finder/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18735"
+BASE_PATH = "/"
