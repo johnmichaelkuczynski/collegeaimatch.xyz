@@ -1,0 +1,185 @@
+COLLEGE FINDER FOR AI 
+
+TWO WORKFLOWS 
+
+WORKFLOW 1: FROM COLLEGE TO SUBJECT 
+
+FIRST: 
+GENERATE LIST OF SCHOOLS MEETING A GIVEN CRITERION; E.G. LOWER TIER; COMMUNITY COLLEGE; LOW TIER COLLEGE; TECHNICAL; VOCATIONAL; SPECIALTY (E.G. JOHNSON & WALES); FOR PROFIT (E.G. WALDEN, GRAND CANYON UNIVERSITY). THE USER MUST ALSO BE ABLE TO SEARCH BY DROPOUT RATE; AND LIKELIHOOD OF PAYING OFF STUDENT DEBT AND, IF SO, HOW MANY YEARS AFTER GRADUARING; ALSO BY HOW MANY YEARS IT TAKES THE AVERAGE STUDENT TO GRADUATE. 
+
+SECOND: GIVEN A PARTICULAR INSTITUTION, LET THE USER INPUT A COURSE (E.G. FINANCE 101) AND SEE IF THERE IS A PRE-EXISTING DEMAND AT THE COLLEGE TO HAVE THAT COURSE TAUGHT MORE CHEAPLY (OR TAUGHT BY AI). 
+
+IMPORTANT POINT: COURSE NAMES ARE TO BE INTEPRETED BROADLY. "FINANCE 101" SHOULD INCLUDE ANYTHING WITH "FINANCE" IN IT OR ANYTHING WITH RELATED TERMS E.G. "MONEY MANAGEMENT." 
+
+THIRD: WHENEVER THE USER GETS A HIT, THE APP SHOULD GIVE HIM KEY CONTACT INFORMATION FOR THE PEOPLE WHO HAVE THE POWER TO IMPLEMENT HIS AI COURSE, I.E. WHO MAKE BIG DECISIONS ABOUT CURRICULUA, SPECIFICALLY BUDGETARY DECISIONS AND DECISINOS ABOUT HOW TO INCORPORATE AI INTO THEIR CURRICULA. 
+
+FOURTH: FOR A GIVEN UNIVERSITY, THE APP MUST MAKE AVAILABLE TO THE USER THE ABILITY TO FIND OUT BASIC FACTS ABOUT WHICH COURSES ARE THE MOST TAUGHT (I.E. HAVE THE HIGHEST ENROLLMENTS AND/OR THE MOST SECTIONS); ALSO, IF POSSIBLE, WHICH COURSES HAVE THE HIGHEST FAIL-OUT RATES. 
+
+FIFTH: FOR A GIVEN UNIVERSITY, THE APP MUST LET THE USER FIND OUT ABOUT DROP OUT RATES, MOST POPULAR MAJORS, MOST FAILED CLASSES, MOST ENROLLED IN CLASSES. 
+
+SIXTH: THE APP MUST BE ABLE TO DO AT LEAST APPROXIMATE CALCULATIONS OF HOW MUCH IT IS CURRENTLY COSTING THE UNIVERSITY TO TEACH TEH COURSE IN QUESTION AND ALSO HOW LITTLE IT WOULD COST THE UNIVERSITY TO USE MY AI COURSES. 
+
+SEVENTH: THE USER MUST HAVE THE OPTION OF INPUTTING HIS AI-COURSE'S VIRTUES (E.G. IT HAS INTERNAL BENCHMARKING, INTERNAL TUTOR, ETC.). AND ON THIS BASIS, THE APP MUST BE ABLE TO GENERATE SHORT BUT IMPACTFUL MARKETING MATERIAL, MAINLY A REACH OUT LETTER TO A DECIDER PLUS SOME COLORFUL COST-RELATED GRAPHS. SEE APPENDICES 1 AND 2. 
+
+ 
+
+
+WORKFLOW 2: FROM SUBJECT TO COLLEGE 
+
+1. USER ENTERS SUBJECT, E.G. "PSYCHOLOGY" OR "PSYCHOLOGY 101." USER ALSO HAS THE OPTION OF ENTERING THE TYPE OF INSTITUTION HE IS INTERESTED: UNIVERSITY, FOUR YEAR COLLEGE, COMMUNITY COLLEGE, FOR PROFIT; HIGH DROP OUT RATE; LOW GRADUATION RATE; AVERAGE AMOUNT OF TIME NEEDED TO GRADUATE; HOW LONG TO PAY OFF DEBT FROM TUITION; FINANCIAL PROSPECTS POST-GRADUATION; MOST POPULAR MAJORS; MOST ENROLLED IN CLASSES; CLASSES WITH HIGHEST FAIL-OUT RATES. 
+NOTE: IF THE USER ENTERS "PSYCHOLOGY" OR "PSYCHOLOGY 101", THE APP DOES NOT INTERPRET THIS NARROWLY. NULL RESPONSES ARE TO BE AVOIDED UNLESS ABSOLUTELY NECESSARY. IF THE USER ENTERS "ADVANCED DIAGONALIZATION THEORY", THEN A NULL HIT MIGHT BE ACCEPTABLE. (AND EVEN THEN, THE APP SHOULD GIVE HIM HITS ADJACENT TO WHAT HE IS LOOKING FOR.) IF HE ENTERS "CRIMINOLOGY", A NULL HIT IS NOT ACCEPTABLE. 
+
+2. AFTER USER ENTERS SUBJECT, APP GIVES HIM COLLEGES THAT LIKELY WANT AN AI-VERSION OF THAT SUBJECT. AS A RULE, COLLEGES WANT AN AI-VERSION OF A SUBJECT WHEN HUGE NUMBERS OF STUDENTS TAKE THE COURSE. SUCH CLASSES INCLUDE ETHICS, REMEDIAL MATH, REMEDIAL COMPOSITION, ECONOMICS 101, PSYCHOLOGY 101, CRIMINOLOGY 101. IF THE NUMBER OF HITS IS HUGE, THE APP WILL GIVE HIM THE TOP TEN HITS, IN THE SENSE THAT THEY ARE THE TEN MOST LIKELY TO WANT AI COURSES. THE APP WILL ALSO GIVE HIM CONTACT INFORMATION FOR DECIDERS. IF THOSE 10 TURN OUT TO BE DUDS, THE USER CAN KEEP ON SCROLLING THROUGH THE LIST. 
+
+3. AFTER USER SETTLES UPON A TARGET SCHOOL, THE APP MUST GIVE HIM CONTACT INFO FOR DECIDERS. 
+
+4. THE USER MUST HAVE THE OPTION OF INPUTTING HIS AI-COURSE'S VIRTUES (E.G. IT HAS INTERNAL BENCHMARKING, INTERNAL TUTOR, ETC.). AND ON THIS BASIS, THE APP MUST BE ABLE TO GENERATE SHORT BUT IMPACTFUL MARKETING MATERIAL, MAINLY A REACH OUT LETTER TO A DECIDER PLUS SOME COLORFUL COST-RELATED GRAPHS. 
+
+I HAVE UPLOADED A LIST OF LOWER TIER COLLEGES. I WILL BE UPLOADING MORE SUCH LISTS AS THE APP MATURESS .
+
+NECESSARY API KEYS 
+OPENAI 
+College Scorecard API key
+Google Places API (New) key
+Gemini API key
+a web-search API such as SerpAPI, Bing Web Search, Brave Search, or Tavily
+most important combination is: your manually imported college list + College Scorecard + web-search API + Gemini
+
+APPENDIX 1
+
+THE APP SHOULD BE ABLE, FOR ANY GIVEN COLLEGE, TO GENERATE SOME ANALOGUE OF THIS PITCH (WITH THE QUALIFICATION THAT WHAT IT SAYS HAS TO BE TRUE AND THE DETAILS HAVE TO BE SPECIFIC TO THE COLLEGE IN QUESTION, AND WITH THE FURTHER QUALIFICATION THAT SOME COLORFUL PIE CHARTS AND LINE GRAPHS SHOULD BE INVOLVED): 
+
+Zhi Systems Proposal -- California State University, Fresno
+Collapse
+Edit
+Delete
+June 23, 2026
+ZHI SYSTEMS
+AI-Powered Courseware & Outcomes Infrastructure
+
+A Proposal for California State University, Fresno
+Career-Aligned Course Delivery and Embedded Job-Readiness Diagnostics
+
+THE OPPORTUNITY
+
+Fresno State serves one of the most diverse and economically dynamic regions in California, and its public mission rests on a single promise: that a degree should translate into real, demonstrable workplace capability for the students of the Central Valley who earn it. As a Hispanic-Serving Institution operating under the CSU Graduation Initiative 2025, the university is judged not only on access but on completion, equity-gap closure, and post-graduation outcomes. The remaining gap is infrastructure -- a way to deliver high-enrollment gateway courses at scale while proving, course by course, that graduates actually hold the competencies employers expect.
+
+Zhi Systems builds that infrastructure. We supply AI-powered versions of your highest-volume, highest-stakes courses, each carrying embedded diagnostics that verify job-readiness against live industry norms. The result is lower delivery cost, stronger retention through the early gateway courses where the Valley's first-generation students are most at risk, and outcomes evidence the university can put in front of employers, the Chancellor's Office, and WSCUC.
+
+WHAT WE DELIVER
+
+1. A priority courseware package
+
+We have identified the eighteen courses where Fresno State has genuine institutional need -- the general-education gateways that drive early attrition and equity gaps; the core philosophy sequence that anchors the university's critical-thinking, ethics, and humanities requirements; the Craig School of Business cores; the workforce-analytics competencies in highest regional demand; and the criminology and psychology courses central to two of the university's signature programs. Philosophy sits at the center of this package: Philosophy 101, Ethics, Formal Logic, and Critical Thinking supply the reasoning, argumentation, and ethical-judgment competencies that general education promises and that employers consistently rank as the hardest to verify. Each is delivered as a fully built, AI-powered course ready for Canvas.
+
+1. Developmental Mathematics -- Gateway / corequisite math; primary first-year attrition and equity-gap point
+2. Critical Thinking -- GE Area A3 critical-thinking requirement (Philosophy-anchored)
+3. Quantitative Reasoning -- GE Area B4 quantitative requirement
+4. Public Speaking -- GE Area A1 oral-communication requirement
+5. Philosophy 101 -- GE Area C2 humanities gateway; Philosophy Department core
+6. Ethics -- GE values requirement; Philosophy Department core
+7. Formal Logic -- Symbolic / formal logic; Philosophy and CS service course
+8. Business Ethics -- Craig School of Business core; accreditation-aligned
+9. Finance -- Craig School of Business core
+10. Data Analytics -- Highest-demand workforce competency
+11. AI -- Emerging skills / responsible-AI alignment
+12. Financial & Managerial Analytics -- Business and accounting pathways
+13. Marketing Analytics -- Business pathways
+14. Operations & Supply Chain Analytics -- Business and operations pathways
+15. Predictive Analytics -- Analytics specialization
+16. Workforce Analytics -- Management and human-resources pathways
+17. Criminal Psychology -- Criminology programs
+18. Developmental Psychology -- Psychology programs
+
+2. Embedded job-readiness diagnostics
+
+Every course in the package ships with diagnostics that do more than grade -- they measure whether a student has actually acquired the competency the credential claims, and they recalibrate continuously against current industry standards. This converts the university's career-readiness commitment from a statement of intent into auditable, employer-facing evidence.
+
+- Competency verification at the course level, not just completion tracking.
+- Continuous calibration against live labor-market and regional-employer norms.
+- Outcomes data formatted for WSCUC review, Graduation Initiative reporting, and employer partnerships.
+
+THE UNMEASURED CORE: PHILOSOPHY AS CURRENTLY TAUGHT
+
+Here is the uncomfortable truth the package is built to fix. Ethics, Philosophy 101, Critical Thinking, and Formal Logic at Fresno State today operate with no external benchmark and no value indicator of any kind. There is no employer-recognized credential attached to them, no labor-market signal that completing them changes a hire decision, and -- most damning -- no evidence that they succeed even on their own terms. The university cannot show that a student who finishes Critical Thinking reasons measurably better than one who did not, that a Formal Logic graduate constructs or evaluates a valid proof more reliably than a non-taker, or that Ethics produces any demonstrable shift in ethical judgment. By their own stated objectives, these courses are unaudited. They occupy required seats, consume delivery budget, and generate completions, while producing zero verifiable competency gain.
+
+This is not an argument against the subjects -- it is an argument against the absence of measurement. Formal Logic and Critical Thinking are among the most genuinely useful competencies a graduate can carry into any analytic, legal, technical, or managerial career, and even Philosophy 101 can deliver real reasoning value. But potential is not evidence. As delivered now, these courses are taking up space: asserting rigor they never test, claiming transferable skill they never verify. Zhi Systems closes precisely this gap. Our embedded diagnostics attach a live, external, employer-calibrated benchmark to each of these courses, so that for the first time the university can prove -- by the courses' own lights and by the market's -- that the students who take them actually get better at the thing the course exists to teach.
+
+INVESTMENT
+
+Pricing is transparent and fixed: a one-time install per component and a flat annual license. There is no per-seat metering and no enrollment-based escalation.
+
+Priority courseware package (all 18 courses): $580,000 one-time install; $290,000 annual license
+Embedded job-readiness diagnostics: $120,000 one-time install; $78,000 annual license
+Total: $700,000 one-time install; $368,000 annual license
+
+First-year total: $1,068,000. Recurring annual license thereafter: $368,000.
+
+WHY THIS PAYS FOR ITSELF
+
+The package targets the exact courses where students leave -- developmental math and the gen-ed gateways -- and the exact evidence gap that drives accreditor and employer scrutiny. Fresno State's own internal figures put current annual delivery of these eighteen courses at roughly $6.2M, internal outcomes benchmarking at $1.1M, and the annual cost of credentials that do not reliably convert to employment -- attrition, equity-gap funding exposure, and employer dissatisfaction -- at approximately $14.5M. The embedded diagnostics are especially decisive for the philosophy and reasoning courses, where "critical thinking" has always been asserted but rarely measured; here, for the first time, the competency is made auditable. Even a modest improvement in gateway retention, across an enrollment of your scale, returns the full first-year investment many times over in preserved tuition and state apportionment alone.
+
+We are prepared to structure the engagement around agreed retention and outcomes benchmarks, so that the value is measured on your terms, in your numbers. On the institution's own model, the all-in cost of inaction is about $21.8M per year; the all-in cost with Zhi Systems in place is about $6.87M.
+
+NEXT STEPS
+
+- A working session to confirm course priorities and Canvas integration requirements.
+- A scoped pilot on two gateway courses -- Developmental Mathematics and Quantitative Reasoning -- with diagnostics live, to establish a retention baseline.
+- Phased rollout of the full package on a schedule you set.
+
+Zhi Systems -- zhi@zhisystems.org
+
+APPENDIX 2: 
+
+THE APP SHOULD BE ABLE, FOR ANY GIVEN COLLEGE, TO GENERATE SOME ANALOGUE OF THIS REPORT (WITH THE QUALIFICATION THAT WHAT IT SAYS HAS TO BE TRUE AND THE DETAILS HAVE TO BE SPECIFIC TO THE COLLEGE IN QUESTION, AND WITH THE FURTHER QUALIFICATION THAT SOME COLORFUL PIE CHARTS AND LINE GRAPHS SHOULD BE INVOLVED): 
+
+Cal State Fresno (California State University, Fresno)
+Collapse
+Edit
+Delete
+June 23, 2026
+1. Which courses on the list does X have a real need for? List them in priority order, highest need first.
+Developmental Mathematics
+Critical Thinking
+Quantitative Reasoning
+Public Speaking
+Philosophy 101
+Ethics
+Formal Logic
+Business Ethics
+Analytic Philosophy
+Know Thyself
+Finance
+Basic Data Analytics
+AI
+Basic Financial & Managerial Analytics
+Basic Marketing Analytics
+Basic Operations & Supply Chain Analytics
+Basic Predictive Analytics
+Basic Workforce Analytics
+Basic Criminal Psychology
+Basic Developmental Psychology
+2. Take the course X needs most (Y). How much does X currently spend on Y per year?
+$640,000
+3. How much would it cost X to install my AI-powered version of Y?
+$70,000
+4. How much would it cost X to keep Y per year after installation, assuming reasonable maintenance fees?
+$32,000
+5. Across all the courses X needs (from Question 1), what does X currently spend per year to deliver them, added together?
+$6,900,000
+6. How much to install all of the courses from this list that X needs?
+$640,000
+7. Annual cost of keeping said courses up and running?
+$320,000
+8. What does X currently spend per year measuring whether its graduates are actually job-ready (internal benchmarking, assessment, outcomes verification)?
+$1,100,000
+9. What does it cost X per year, in attrition, employer complaints, or accreditation/gainful-employment exposure, that its credentials don't reliably convert to employment?
+$14,500,000
+10. How much would it cost X to install my version's internal diagnostics across the needed courses?
+$130,000
+11. How much per year to keep those diagnostics calibrated against live industry norms?
+$84,000
+12. Total cost to institution if they do not use my services.
+$22,500,000
+13. Total cost if they do use my services.
+$6,974,000
