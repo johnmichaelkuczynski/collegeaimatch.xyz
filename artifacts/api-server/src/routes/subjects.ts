@@ -56,10 +56,12 @@ router.get("/subjects/search", async (req, res): Promise<void> => {
     // AI ranking
     const rankings = await rankCollegesForSubject(subject, infos);
 
-    // Merge results
+    // Merge results — AI returns numeric index as collegeId
     const results = rankings.slice(0, limit ?? 10).map((rank, rankIdx) => {
-      // Match by index position (AI is given positional data)
-      const college = infos[rankIdx] ?? infos[0];
+      const idx = typeof rank.collegeId === "number"
+        ? rank.collegeId
+        : parseInt(String(rank.collegeId), 10);
+      const college = infos[isNaN(idx) ? rankIdx : idx] ?? infos[rankIdx] ?? infos[0];
       const dbRow = raw.find((r) => r.id === college.dbId) ?? raw[rankIdx] ?? raw[0];
       const dropoutRate =
         dbRow.completionRate != null

@@ -309,19 +309,19 @@ Return a JSON object with a "rankings" array, each item: { collegeId, opportunit
 
   const userPrompt = `Subject: "${subject}"
 
-Colleges to rank (id | name | type | enrollment | dropoutRate):
+Colleges to rank (index | name | type | enrollment | dropoutRate):
 ${colleges
   .slice(0, 30)
   .map(
-    (c) =>
-      `${c.enrollmentSize || "?"} enrolled | ${c.dropoutRate?.toFixed(1) ?? "?"}% dropout | ${c.type} | ${c.name} (${c.state}) | id:${c.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${colleges.indexOf(c)}`
+    (c, i) =>
+      `${i} | ${c.name} (${c.state}) | ${c.type} | ${c.enrollmentSize || "?"} enrolled | ${c.dropoutRate?.toFixed(1) ?? "?"}% dropout`
   )
   .join("\n")}
 
 Rank these colleges by how strongly they need an AI course for "${subject}". High-enrollment gateway courses at community colleges, for-profit schools, and schools with high dropout rates score highest.
-Estimate realistic enrollments for this subject at each institution.`;
+Use the numeric index (0, 1, 2…) as the collegeId. Estimate realistic enrollments for this subject at each institution.`;
 
-  const raw = await geminiChat(userPrompt);
+  const raw = await openaiChat(systemPrompt, userPrompt);
   const parsed = JSON.parse(raw) as { rankings: SubjectOpportunity[] };
   return parsed.rankings ?? [];
 }
@@ -331,7 +331,7 @@ export async function generatePopularMajors(
 ): Promise<string[]> {
   const systemPrompt = `Return a JSON object with a "majors" array of 5-8 popular major names for this college type. Be brief.`;
   const userPrompt = `College type: ${college.type}, name: ${college.name}, state: ${college.state}, size: ${college.enrollmentSize}`;
-  const raw = await geminiChat(userPrompt);
+  const raw = await openaiChat(systemPrompt, userPrompt);
   const parsed = JSON.parse(raw) as { majors: string[] };
   return parsed.majors ?? [];
 }
