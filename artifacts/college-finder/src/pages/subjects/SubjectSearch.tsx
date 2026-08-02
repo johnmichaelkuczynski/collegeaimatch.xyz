@@ -22,24 +22,29 @@ const INSTITUTION_TYPES = [
 export default function SubjectSearch() {
   const [subject, setSubject] = React.useState("")
   const [type, setType] = React.useState("all")
-  const [hasSearched, setHasSearched] = React.useState(false)
+  // submittedSubject only changes when the user actually hits Hunt
+  // this drives enabled: !!submittedSubject reliably, no refetch() needed
+  const [submittedSubject, setSubmittedSubject] = React.useState("")
+  const [submittedType, setSubmittedType] = React.useState("all")
 
-  const { data: results, isLoading, refetch } = useSearchBySubject({
-    subject,
-    institutionType: type !== "all" ? type : undefined,
+  const { data: results, isLoading } = useSearchBySubject({
+    subject: submittedSubject,
+    institutionType: submittedType !== "all" ? submittedType : undefined,
     limit: 20
   }, {
     query: {
-      enabled: false, // Only fetch on manual trigger
-      queryKey: getSearchBySubjectQueryKey({ subject, institutionType: type !== "all" ? type : undefined, limit: 20 })
+      enabled: !!submittedSubject,
+      staleTime: 1000 * 60 * 5, // 5 min cache
     }
   })
+
+  const hasSearched = !!submittedSubject
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (!subject.trim()) return
-    setHasSearched(true)
-    refetch()
+    setSubmittedSubject(subject.trim())
+    setSubmittedType(type)
   }
 
   const getScoreColor = (score: number) => {
