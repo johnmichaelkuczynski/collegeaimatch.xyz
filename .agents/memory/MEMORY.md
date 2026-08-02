@@ -1,0 +1,1 @@
+- [College data source](college-data-source.md) — api.data.ed.gov is DNS-blocked; colleges are seeded from IPEDS HD2023 via nces.ed.gov into local PostgreSQL.

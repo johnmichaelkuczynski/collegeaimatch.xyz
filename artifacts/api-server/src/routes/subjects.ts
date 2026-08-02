@@ -1,9 +1,7 @@
 import { Router, type IRouter } from "express";
+import { and, eq, ilike, desc } from "drizzle-orm";
+import { db, collegesTable } from "@workspace/db";
 import { SearchBySubjectQueryParams } from "@workspace/api-zod";
-import {
-  searchScorecardColleges,
-  carnegieToType,
-} from "../lib/collegeScorecard";
 import { rankCollegesForSubject, type CollegeInfo } from "../lib/aiClient";
 
 const router: IRouter = Router();
@@ -23,14 +21,17 @@ router.get("/subjects/search", async (req, res): Promise<void> => {
   }
 
   try {
-    // Fetch colleges matching optional filters — cast wider net than requested limit
-    const fetchLimit = Math.min((limit ?? 10) * 4, 100);
-    const { colleges: raw } = await searchScorecardColleges({
-      type: institutionType,
-      state,
-      limit: fetchLimit,
-      page: 1,
-    });
+    const conditions = [eq(collegesTable.isActive, true)];
+    if (institutionType) conditions.push(eq(collegesTable.type, institutionType));
+    if (state) conditions.push(eq(collegesTable.state, state.toUpperCase()));
+
+    // Fetch a wider pool ranked by opportunity score, then let AI rank for subject fit
+    const raw = await db
+      .select()
+      .from(collegesTable)
+      .where(and(...conditions))
+      .orderBy(desc(collegesTable.aiOpportunityScore), desc(collegesTable.enrollmentSize))
+      .limit(Math.min((limit ?? 10) * 5, 100));
 
     if (raw.length === 0) {
       res.json([]);
@@ -38,92 +39,69 @@ router.get("/subjects/search", async (req, res): Promise<void> => {
     }
 
     // Build CollegeInfo list for the AI ranker
-    const infos: (CollegeInfo & { id: string })[] = raw.map((sc) => {
-      const type = carnegieToType(sc.ownership, sc.carnegieBasic, sc.enrollmentSize);
-      const dropoutRate =
-        sc.completionRate != null
-          ? Math.round((1 - sc.completionRate) * 100 * 10) / 10
-          : null;
+    const infos: (CollegeInfo & { dbId: number })[] = raw.map((c) => {
+      const completionRate = c.completionRate ?? 0.6;
       return {
-        id: String(sc.id),
-        name: sc.name,
-        city: sc.city,
-        state: sc.state,
-        type,
-        enrollmentSize: sc.enrollmentSize,
-        dropoutRate,
-        tuitionInState: sc.tuitionInState,
+        dbId: c.id,
+        name: c.name,
+        city: c.city,
+        state: c.state,
+        type: c.type,
+        enrollmentSize: c.enrollmentSize,
+        dropoutRate: Math.round((1 - completionRate) * 100 * 10) / 10,
+        tuitionInState: c.tuitionInState,
       };
     });
 
-    // Rank them with AI
+    // AI ranking
     const rankings = await rankCollegesForSubject(subject, infos);
 
-    // Merge ranked results with full college data
-    const resultsMap = new Map<string, (typeof infos)[0]>();
-    infos.forEach((c) => resultsMap.set(c.id, c));
+    // Merge results
+    const results = rankings.slice(0, limit ?? 10).map((rank, rankIdx) => {
+      // Match by index position (AI is given positional data)
+      const college = infos[rankIdx] ?? infos[0];
+      const dbRow = raw.find((r) => r.id === college.dbId) ?? raw[rankIdx] ?? raw[0];
+      const dropoutRate =
+        dbRow.completionRate != null
+          ? Math.round((1 - dbRow.completionRate) * 100 * 10) / 10
+          : null;
 
-    const results = rankings
-      .slice(0, limit ?? 10)
-      .map((rank) => {
-        // Find the matching college by matching name-based id pattern
-        const college = infos.find((c, i) => {
-          const genId = `${c.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${i}`;
-          return rank.collegeId === genId || rank.collegeId.includes(c.name.replace(/[^a-z0-9]/gi, "_").toLowerCase());
-        }) ?? infos[rankings.indexOf(rank)] ?? infos[0];
-
-        const sc = raw.find((r) => String(r.id) === college?.id);
-        const type = college
-          ? carnegieToType(
-              sc?.ownership ?? 1,
-              sc?.carnegieBasic ?? 0,
-              sc?.enrollmentSize ?? 0
-            )
-          : "four_year";
-
-        const dropoutRate =
-          sc?.completionRate != null
-            ? Math.round((1 - sc.completionRate) * 100 * 10) / 10
-            : null;
-
-        let oppScore = 50;
-        if (type === "community_college") oppScore += 20;
-        if (type === "for_profit") oppScore += 15;
-        if (dropoutRate && dropoutRate > 40) oppScore += 15;
-        if ((sc?.enrollmentSize ?? 0) > 5000) oppScore += 10;
-
-        return {
-          college: {
-            id: college?.id ?? String(sc?.id ?? ""),
-            name: college?.name ?? "",
-            city: college?.city ?? "",
-            state: college?.state ?? "",
-            type,
-            enrollmentSize: sc?.enrollmentSize ?? 0,
-            dropoutRate,
-            graduationRate:
-              sc?.completionRate != null
-                ? Math.round(sc.completionRate * 100 * 10) / 10
-                : null,
-            avgGraduationYears: type === "community_college" ? 3.2 : 4.4,
-            debtPayoffYears: null,
-            tuitionInState: sc?.tuitionInState ?? null,
-            tuitionOutOfState: sc?.tuitionOutOfState ?? null,
-            accreditation: null,
-            url: sc?.url ?? null,
-            description: null,
-            popularMajors: [],
-            aiOpportunityScore: Math.min(rank.opportunityScore ?? oppScore, 98),
-          },
-          subject,
-          opportunityScore: rank.opportunityScore ?? oppScore,
-          reason: rank.reason ?? `High-enrollment ${subject} course with strong AI replacement potential.`,
-          estimatedEnrollment: rank.estimatedEnrollment ?? Math.round((sc?.enrollmentSize ?? 500) * 0.08),
-          estimatedAnnualCost:
-            rank.estimatedAnnualCost ??
-            Math.round((sc?.enrollmentSize ?? 500) * 0.08 * 180),
-        };
-      });
+      return {
+        college: {
+          id: String(dbRow.id),
+          name: dbRow.name,
+          city: dbRow.city,
+          state: dbRow.state,
+          type: dbRow.type,
+          enrollmentSize: dbRow.enrollmentSize,
+          dropoutRate,
+          graduationRate:
+            dbRow.completionRate != null
+              ? Math.round(dbRow.completionRate * 100 * 10) / 10
+              : null,
+          avgGraduationYears: dbRow.type === "community_college" ? 3.2 : 4.4,
+          debtPayoffYears: null,
+          tuitionInState: dbRow.tuitionInState,
+          tuitionOutOfState: dbRow.tuitionOutOfState,
+          accreditation: null,
+          url: dbRow.url,
+          description: null,
+          popularMajors: [],
+          aiOpportunityScore: dbRow.aiOpportunityScore,
+        },
+        subject,
+        opportunityScore: rank.opportunityScore ?? dbRow.aiOpportunityScore,
+        reason:
+          rank.reason ??
+          `High-enrollment ${subject} course with strong AI replacement potential.`,
+        estimatedEnrollment:
+          rank.estimatedEnrollment ??
+          Math.round(dbRow.enrollmentSize * 0.08),
+        estimatedAnnualCost:
+          rank.estimatedAnnualCost ??
+          Math.round(dbRow.enrollmentSize * 0.08 * 180),
+      };
+    });
 
     res.json(results);
   } catch (err) {
