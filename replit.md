@@ -1,73 +1,99 @@
-# College Finder for AI
+# 🎓 COLLEGE FINDER FOR AI
 
-A B2B sales intelligence platform for Zhi Systems, used to identify colleges that are strong candidates to replace high-enrollment courses with AI-powered alternatives. Two workflows: College→Subject and Subject→College. Generates cost-analysis reports, decision-maker contact lists, and outreach proposal letters with charts.
+https://college-finder.zhisystems.com
 
-## Run & Operate
+**The AI Sales Rep's Edge — Find, Qualify, and Close US Colleges Before the Competition Does.**
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
-- `pnpm --filter @workspace/college-finder run dev` — run the frontend (auto-assigned port)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string (auto-provisioned)
+---
 
-## API Keys Required
+## ⚙️ Overview
 
-- `COLLEGE_SCORECARD_API_KEY` — https://collegescorecard.ed.gov/data/documentation/
-- `GOOGLE_PLACES_API_KEY` — Google Cloud Console (Places API)
-- `OPENAI_API_KEY` — https://platform.openai.com/api-keys (used for outreach letter generation and course analysis)
-- `GEMINI_API_KEY` — https://aistudio.google.com/app/apikey (used for college ranking and cost analysis)
-- `SERPAPI_KEY` — https://serpapi.com (web search for college leadership contacts)
+College Finder for AI is a B2B sales intelligence platform built exclusively for Zhi Systems account executives. It surfaces the highest-opportunity US colleges for AI-powered course replacement, generates fully reasoned outreach proposals, and delivers verified contact data for the exact people who control curriculum and budget.
 
-## Stack
+It searches 4,153 active, degree-granting US institutions ranked by dropout rate, enrollment size, and AI opportunity score. For every prospect it identifies the specific courses to target, models the cost displacement, and writes the outreach letter.
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- Frontend: React + Vite + Tailwind + shadcn/ui + wouter + Recharts
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM (proposals table only; college data from external APIs)
-- Validation: Zod, drizzle-zod
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
-- External: College Scorecard API, SerpAPI, OpenAI GPT-4o-mini, Gemini 1.5 Flash
+Designed for reps who close enterprise education deals, it replaces a week of manual research with a two-minute workflow — college search, course targeting, cost analysis, contact lookup, and proposal generation in a single session.
 
-## Where things live
+---
 
-- `lib/api-spec/openapi.yaml` — API contract (source of truth)
-- `lib/db/src/schema/proposals.ts` — proposals table schema
-- `artifacts/api-server/src/lib/collegeScorecard.ts` — College Scorecard API client
-- `artifacts/api-server/src/lib/aiClient.ts` — OpenAI + Gemini helpers (courses, contacts, proposals, cost analysis)
-- `artifacts/api-server/src/lib/serpapi.ts` — web search for contacts
-- `artifacts/api-server/src/routes/colleges.ts` — college search + detail routes
-- `artifacts/api-server/src/routes/subjects.ts` — subject-to-college search
-- `artifacts/api-server/src/routes/proposals.ts` — proposal CRUD + AI generation
-- `artifacts/api-server/src/routes/dashboard.ts` — dashboard summary
-- `artifacts/college-finder/src/` — React frontend
+## 🔗 What It Does
 
-## Architecture decisions
+**College Search** -- Query 4,153 active US institutions by name, state, type, and dropout rate. Flexible multi-word search matches partial names and abbreviations. Results paginate with 20 per page.
 
-- All college/course/contact data comes from external APIs (College Scorecard + AI generation) — no local college database. Only proposals are persisted in Postgres.
-- Courses and contacts are AI-generated per request (OpenAI for courses/contacts/proposals, Gemini for subject ranking). No caching yet — add Redis or DB-backed cache to reduce latency.
-- The orval config was modified to remove separate TypeScript type generation (`schemas` option removed) to avoid TS2308 name collision between Zod schemas and TypeScript interfaces when operations have both path and query params.
-- All integer fields in the OpenAPI spec use `type: number` (not `type: integer`) because Orval generates `zod.int()` for integers, which is a Zod v4 feature not available in this project's Zod v3.
+**Hot Lead Scoring** -- Every college carries an AI Opportunity Score (0–100) derived from enrollment size, dropout rate, and institution type. Scores above 80 surface as Hot Lead badges so reps know where to focus.
 
-## Product
+**Target Courses** -- AI identifies the specific high-enrollment courses at each institution most susceptible to AI displacement — with enrollment estimates, current cost burden, and displacement confidence.
 
-- **Workflow 1 (College → Subject):** Search colleges by type/state/dropout rate, pick one, explore AI-candidate courses, see decision-maker contacts, run cost analysis, generate proposal
-- **Workflow 2 (Subject → College):** Enter a subject (e.g. "Psychology 101"), get colleges ranked by how much they need AI courses for that subject, drill into contacts and generate proposals
-- **Proposals:** Save generated outreach letters + cost charts; track pipeline across colleges
+**Cost Analysis** -- Full side-by-side ROI model: current annual cost vs. projected cost with AI integration. Bar chart and cost-breakdown donut. Includes net savings and three-year projection figures.
+
+**Real Contact Intelligence** -- Decision-maker contacts sourced from live web data via SerpAPI — provosts, VPs of Academic Affairs, deans of instruction, CIOs. Real names pulled from public web; no invented placeholders.
+
+**Hunter.io Email Verification** -- Every contact email is verified in real time through Hunter.io email-finder. Confidence score required ≥ 40 before an address is accepted. Student-ID-format addresses are filtered automatically.
+
+**LinkedIn Search Links** -- Each contact card links directly to a LinkedIn people search scoped to that person's name and institution — resolves to the correct profile rather than a guessed URL that 404s.
+
+**Proposal Generation** -- One click produces a full outreach proposal: course targets, cost displacement analysis, and a personalized outreach letter in the voice and register appropriate for academic leadership.
+
+**Proposal Management** -- Every generated proposal is saved and retrievable. View, revisit, and track the full pipeline of institutions across sessions.
+
+**Subject → College Search** -- Enter a subject area — Remedial Math, Intro Economics — and the platform ranks the colleges most receptive to AI replacement in that domain, scored and sorted automatically.
+
+**Dashboard** -- Pipeline overview: total proposals generated, institutions contacted, average opportunity score, and cost displacement modeled across the full prospect universe.
+
+---
+
+## ⚙️ Technical Features
+
+**IPEDS Database Backbone** -- All 4,153 institutions sourced from NCES IPEDS HD2023 — the federal census of US postsecondary education. Data includes enrollment size, institution type, Carnegie classification, control (public/private), tuition, and completion rates.
+
+**OpenAI Analysis Engine** -- GPT-4o-mini powers all AI tasks: course identification, contact extraction, cost modeling, subject ranking, and proposal writing. All prompts run at temperature 0 for deterministic, repeatable output.
+
+**SerpAPI Contact Discovery** -- Four parallel Google searches per college target provosts, VPs of Academic Affairs, deans, and CIOs. Snippets are parsed for real names and phone numbers before any AI processing occurs.
+
+**Hunter.io Email Enrichment** -- Per-person email lookup via Hunter.io email-finder API. Returns verified addresses with confidence scoring. Falls back to domain-pattern construction only when Hunter cannot resolve the address.
+
+**Multi-Word Flexible Search** -- Query terms are split on whitespace and applied as independent ILIKE conditions against the college name. Partial matches, acronyms, and transposed words all resolve correctly.
+
+**Opportunity Scoring** -- Composite score weights enrollment size (40%), dropout rate (40%), and institution type (20%). Community colleges and large public four-years dominate the top of the list by design.
+
+**PostgreSQL + Drizzle ORM** -- All college data, proposals, and pipeline state stored in a managed PostgreSQL database. Drizzle ORM provides type-safe query construction with no raw SQL in business logic.
+
+**React + Vite Frontend** -- Single-page application with wouter routing, Tailwind CSS, shadcn/ui components, and Recharts data visualization. All API calls go through React Query with loading and error state management.
+
+---
+
+## 🎓 Designed For
+
+**Account Executives at AI EdTech Companies** -- Run a full prospecting workflow in minutes. Find the college, identify the course, model the savings, get the contact, write the pitch.
+
+**Sales Directors Building Territory Plans** -- Filter by state, institution type, and dropout rate to carve territories. Export proposals for pipeline tracking.
+
+**Business Development Reps Doing Outreach** -- Each contact card links to a verified email and a LinkedIn people search. The proposal includes a ready-to-send outreach letter in academic register.
+
+**Sales Engineers Preparing Discovery Calls** -- Cost analysis and course targeting give reps the institutional knowledge to walk into a call prepared — without spending hours on a college's website.
+
+**Team Leads Reviewing Opportunity Quality** -- Hot Lead scoring, opportunity scores, and cost displacement figures make it easy to rank prospects and prioritize the highest-value conversations.
+
+---
+
+## 💡 Core Idea
+
+Most sales tools give you a list. College Finder gives you the pitch.
+
+It treats every institution as a structured sales opportunity — a budget to be modeled, a curriculum to be analyzed, a set of decision-makers to be identified. The output is not a CRM record with a name and a phone number. It is a complete, reasoned case for why this college should replace this course with AI, delivered with the cost figures and the letter.
+
+No invented contacts. No placeholder phone numbers. No 404 LinkedIn links.
+
+**College Finder for AI — precision sales intelligence for the AI education market.**
+
+---
+
+> Zhi Systems — https://zhisystems.com
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-- After any OpenAPI spec change, run `pnpm --filter @workspace/api-spec run codegen` and then restart both workflows.
-- Do NOT add `type: integer` to the OpenAPI spec — use `type: number`. Orval generates `zod.int()` for integers which breaks typecheck in Zod v3.
-- Do NOT re-add `schemas: { path: "generated/types", type: "typescript" }` to `lib/api-spec/orval.config.ts` — it causes TS2308 collisions for operations that have both path and query params.
-- College Scorecard API pages are 0-indexed internally but our API uses 1-indexed pages (conversion happens in `collegeScorecard.ts`).
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- All AI calls use OpenAI GPT-4o-mini (Gemini removed — quota exhausted, model deprecated)
+- Contact data must be real: SerpAPI → AI name extraction → Hunter.io email verification pipeline
+- Never use api.data.ed.gov (DNS-blocked on Replit); all college data is in local PostgreSQL from IPEDS HD2023
+- Phone numbers must be real; 555-0xxx numbers are filtered in post-processing
+- LinkedIn links use search URLs (linkedin.com/search/results/people) not invented profile slugs
