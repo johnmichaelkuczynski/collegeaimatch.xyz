@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
+import ReadMe from './pages/ReadMe';
 import { Toaster } from '@/components/ui/toaster';
 import NotFound from '@/pages/not-found';
 import { Shell } from '@/components/layout/Shell';
@@ -23,6 +24,7 @@ function Router() {
         <Route path="/subjects" component={SubjectSearch} />
         <Route path="/proposals" component={ProposalsList} />
         <Route path="/proposals/:id" component={ProposalDetail} />
+        <Route path="/readme" component={ReadMe} />
         <Route component={NotFound} />
       </Switch>
     </Shell>
