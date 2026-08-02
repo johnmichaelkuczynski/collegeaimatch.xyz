@@ -153,15 +153,15 @@ export async function generateContacts(
     ? `Real phone numbers found:\n${realPhones.map((p) => `  - ${p}`).join("\n")}`
     : `No real phone numbers found — use the institution's main switchboard if known from snippets, otherwise leave phone as empty string "".`;
 
-  const systemPrompt = `You are an expert at identifying higher education decision-makers.
-Extract and return real contact data from the provided web search snippets.
+  const systemPrompt = `You are extracting REAL contact data from web search snippets for a sales intelligence tool.
 
-STRICT RULES:
-1. ONLY use names and titles that actually appear in the search snippets. Do not invent names.
-2. NEVER use 555 phone numbers. NEVER make up phone numbers. If you cannot find a real number, use "".
-3. Use the real email addresses provided if available. For others, construct plausible emails from the college domain.
-4. Do NOT generate LinkedIn URLs — leave linkedinUrl as "".
-5. Return 4-6 contacts covering: chief academic officer/provost, VP academic affairs, dean of instruction, CIO/CTO, department chair, budget/finance officer.
+ABSOLUTE RULES — violating any of these makes the output worthless:
+1. A contact entry is ONLY allowed if a real person's full name (first + last) appears explicitly in the snippets. No name found = no entry.
+2. NEVER invent or guess names. Do not use: John Smith, Jane Smith, John Doe, Jane Doe, or any placeholder.
+3. NEVER use 555 phone numbers or invent phone numbers. Use "" for phone if not found in snippets.
+4. Leave linkedinUrl as "" always.
+5. It is BETTER to return 2 real contacts than 6 invented ones. Quality over quantity.
+6. For email: use a real email found in the snippets if available. If not found, construct "firstname.lastname@domain" using the college domain. Never use random character strings (like mr647738@) as emails.
 
 Return a JSON object with a "contacts" array. Each item: name, title, department, email, phone, linkedinUrl (always ""), decisionPower (one of: provost, curriculum, budget, ai_strategy).`;
 
@@ -182,33 +182,44 @@ Extract real names and titles from these snippets. If snippets don't mention eno
   const parsed = JSON.parse(raw) as { contacts: ContactData[] };
 
   // Post-process: strip fake numbers and placeholder names
-  // Job title words that indicate the AI used the title as the name
-  const JOB_TITLE_WORDS = [
+  // Known placeholder / generic names the AI uses when it can't find real people
+  const FAKE_NAMES = new Set([
+    "john doe", "jane doe", "john smith", "jane smith", "tbd", "[name tbd]",
+    "name tbd", "unknown", "first last", "firstname lastname",
+    "sarah johnson", "michael johnson", "robert johnson", "mary johnson",
+    "sarah williams", "michael williams", "sarah brown", "michael brown",
+    "sarah davis", "michael davis", "sarah miller", "michael miller",
+    "james wilson", "mary wilson", "robert wilson", "sarah wilson",
+    "thomas anderson", "mary anderson", "james anderson",
+  ]);
+
+  // Job title words that indicate name field contains a title, not a person
+  const TITLE_STARTS = [
     "officer", "director", "dean", "president", "provost", "chancellor",
     "manager", "coordinator", "administrator", "chair", "professor",
-    "vice president", "vp ", "tbd", "unknown",
+    "vice president", "vp ", "tbd", "unknown", "associate vice",
   ];
 
   const cleaned = (parsed.contacts ?? [])
     .filter((c) => {
       const name = (c.name ?? "").toLowerCase().trim();
-      if (name.length < 3) return false;
-      // Drop obvious placeholder names
-      if (["john doe", "jane doe", "tbd", "[name tbd]"].includes(name)) return false;
-      // Drop entries where the "name" is just a job title (no space = likely one word title; or matches known job words with no personal name structure)
-      const hasPersonalNameStructure = name.split(/\s+/).length >= 2;
-      if (!hasPersonalNameStructure) return false;
-      // If the name IS the title (name === title), it's a placeholder
-      const title = (c.title ?? "").toLowerCase().trim();
-      if (name === title) return false;
-      // If the name contains only job-title words and no apparent surname
-      const nameWords = name.split(/\s+/);
-      const looksLikeTitle = JOB_TITLE_WORDS.some(
-        (w) => name.startsWith(w) && nameWords.length <= 3
-      );
-      if (looksLikeTitle && name === name.toLowerCase()) return false; // all lowercase = not a proper name
+      if (name.length < 4) return false;
+      if (FAKE_NAMES.has(name)) return false;
+      // Must have at least two words (first + last name)
+      if (name.split(/\s+/).length < 2) return false;
+      // If name equals title, it's a placeholder
+      if (name === (c.title ?? "").toLowerCase().trim()) return false;
+      // If name starts with a job title word, it's a title not a name
+      if (TITLE_STARTS.some((w) => name.startsWith(w))) return false;
       return true;
     })
+    .map((c) => ({
+      ...c,
+      // Remove student-ID style emails: letters + 5+ digits @ domain
+      email: /^[a-z]{1,3}\d{5,}@/.test(c.email ?? "") ? "" : (c.email ?? ""),
+      // Kill any invented 555-0xxx numbers
+      phone: /555.?0\d{3}/.test(c.phone ?? "") ? "" : (c.phone ?? ""),
+    }))
     .map((c) => ({
       ...c,
       // Kill any 555-0xxx numbers (NANP reserved for fiction)

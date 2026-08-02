@@ -1,1 +1,2 @@
 - [College data source](college-data-source.md) — api.data.ed.gov is DNS-blocked; colleges are seeded from IPEDS HD2023 via nces.ed.gov into local PostgreSQL.
+- [Contacts pipeline](contacts-pipeline.md) — real contacts: SerpAPI (4 parallel searches) → AI extracts names only → Hunter.io email-finder enriches per-person. Never invent names or 555 numbers.

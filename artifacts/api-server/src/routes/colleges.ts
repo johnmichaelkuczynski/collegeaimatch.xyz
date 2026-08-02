@@ -19,6 +19,7 @@ import {
   type CollegeInfo,
 } from "../lib/aiClient";
 import { findCollegeLeadership } from "../lib/serpapi";
+import { enrichContactEmails } from "../lib/hunter";
 
 const router: IRouter = Router();
 
@@ -253,7 +254,17 @@ router.get("/colleges/:collegeId/contacts", async (req, res): Promise<void> => {
       collegeDomain
     );
 
-    res.json(contacts.map((c) => ({ ...c, institution: row.name })));
+    // Enrich emails via Hunter.io if we have a domain
+    let enriched = contacts;
+    if (collegeDomain) {
+      const hunterEmails = await enrichContactEmails(contacts, collegeDomain);
+      enriched = contacts.map((c, i) => ({
+        ...c,
+        email: hunterEmails[i] || c.email,
+      }));
+    }
+
+    res.json(enriched.map((c) => ({ ...c, institution: row.name })));
   } catch (err) {
     req.log.error({ err }, "Get college contacts failed");
     res.status(500).json({ error: "Failed to get contacts" });
