@@ -18,7 +18,7 @@ import {
   generatePopularMajors,
   type CollegeInfo,
 } from "../lib/aiClient";
-import { webSearch } from "../lib/serpapi";
+import { findCollegeLeadership } from "../lib/serpapi";
 
 const router: IRouter = Router();
 
@@ -242,11 +242,16 @@ router.get("/colleges/:collegeId/contacts", async (req, res): Promise<void> => {
     const college = toAPICollege(row);
     const info = toCollegeInfo(college, row);
 
-    const results = await webSearch(
-      `"${row.name}" provost OR "vice president academic affairs" OR "chief academic officer" OR "dean of instruction"`
+    const { allSnippets, realEmails, realPhones, collegeDomain } =
+      await findCollegeLeadership(row.name, row.url);
+
+    const contacts = await generateContacts(
+      info,
+      allSnippets,
+      realEmails,
+      realPhones,
+      collegeDomain
     );
-    const snippets = results.map((r) => `${r.title}: ${r.snippet}`).slice(0, 5);
-    const contacts = await generateContacts(info, snippets);
 
     res.json(contacts.map((c) => ({ ...c, institution: row.name })));
   } catch (err) {

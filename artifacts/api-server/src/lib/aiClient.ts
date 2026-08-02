@@ -140,26 +140,89 @@ Annual cost should reflect credit hours * sections * instructor salary/benefits 
 
 export async function generateContacts(
   college: CollegeInfo,
-  searchSnippets: string[]
+  searchSnippets: string[],
+  realEmails: string[] = [],
+  realPhones: string[] = [],
+  collegeDomain: string | null = null
 ): Promise<ContactData[]> {
+  const emailNote = realEmails.length > 0
+    ? `Real email addresses found:\n${realEmails.map((e) => `  - ${e}`).join("\n")}`
+    : `No real emails found in search. Construct emails using format: firstname.lastname@${collegeDomain ?? "institution.edu"}`;
+
+  const phoneNote = realPhones.length > 0
+    ? `Real phone numbers found:\n${realPhones.map((p) => `  - ${p}`).join("\n")}`
+    : `No real phone numbers found — use the institution's main switchboard if known from snippets, otherwise leave phone as empty string "".`;
+
   const systemPrompt = `You are an expert at identifying higher education decision-makers.
-Generate realistic contact data for people who have decision-making power over curriculum, budgets, and AI adoption at this institution.
-Return a JSON object with a "contacts" array.
-Each contact must include: name, title, department, email (use realistic institutional format: first.last@institution.edu), phone, linkedinUrl, decisionPower (one of: curriculum, budget, ai_strategy, provost).
-Generate 4-6 contacts including provost/VPAA, dean of instruction, department chairs, and chief information/technology officer.`;
+Extract and return real contact data from the provided web search snippets.
+
+STRICT RULES:
+1. ONLY use names and titles that actually appear in the search snippets. Do not invent names.
+2. NEVER use 555 phone numbers. NEVER make up phone numbers. If you cannot find a real number, use "".
+3. Use the real email addresses provided if available. For others, construct plausible emails from the college domain.
+4. Do NOT generate LinkedIn URLs — leave linkedinUrl as "".
+5. Return 4-6 contacts covering: chief academic officer/provost, VP academic affairs, dean of instruction, CIO/CTO, department chair, budget/finance officer.
+
+Return a JSON object with a "contacts" array. Each item: name, title, department, email, phone, linkedinUrl (always ""), decisionPower (one of: provost, curriculum, budget, ai_strategy).`;
 
   const userPrompt = `College: ${college.name} (${college.state})
 Type: ${college.type}
-Enrollment: ${college.enrollmentSize}
+Enrollment: ${college.enrollmentSize.toLocaleString()}
 
-Web search snippets about this college's leadership:
-${searchSnippets.length > 0 ? searchSnippets.join("\n") : "No snippets available — generate plausible institutional contacts."}
+${emailNote}
 
-Generate realistic but fictional decision-maker contacts for this institution. Use the college's domain for email addresses.`;
+${phoneNote}
+
+Web search snippets (extract real people from these):
+${searchSnippets.slice(0, 15).join("\n---\n")}
+
+Extract real names and titles from these snippets. If snippets don't mention enough names for 4-6 contacts, fill the remaining slots with plausible titles for this institution type but STILL leave phone as "" and do NOT use 555 numbers.`;
 
   const raw = await openaiChat(systemPrompt, userPrompt);
   const parsed = JSON.parse(raw) as { contacts: ContactData[] };
-  return parsed.contacts ?? [];
+
+  // Post-process: strip fake numbers and placeholder names
+  // Job title words that indicate the AI used the title as the name
+  const JOB_TITLE_WORDS = [
+    "officer", "director", "dean", "president", "provost", "chancellor",
+    "manager", "coordinator", "administrator", "chair", "professor",
+    "vice president", "vp ", "tbd", "unknown",
+  ];
+
+  const cleaned = (parsed.contacts ?? [])
+    .filter((c) => {
+      const name = (c.name ?? "").toLowerCase().trim();
+      if (name.length < 3) return false;
+      // Drop obvious placeholder names
+      if (["john doe", "jane doe", "tbd", "[name tbd]"].includes(name)) return false;
+      // Drop entries where the "name" is just a job title (no space = likely one word title; or matches known job words with no personal name structure)
+      const hasPersonalNameStructure = name.split(/\s+/).length >= 2;
+      if (!hasPersonalNameStructure) return false;
+      // If the name IS the title (name === title), it's a placeholder
+      const title = (c.title ?? "").toLowerCase().trim();
+      if (name === title) return false;
+      // If the name contains only job-title words and no apparent surname
+      const nameWords = name.split(/\s+/);
+      const looksLikeTitle = JOB_TITLE_WORDS.some(
+        (w) => name.startsWith(w) && nameWords.length <= 3
+      );
+      if (looksLikeTitle && name === name.toLowerCase()) return false; // all lowercase = not a proper name
+      return true;
+    })
+    .map((c) => ({
+      ...c,
+      // Kill any 555-0xxx numbers (NANP reserved for fiction)
+      phone: /555.?0\d{3}/.test(c.phone ?? "") ? "" : (c.phone ?? ""),
+    }));
+
+  // Deduplicate by name
+  const seen = new Set<string>();
+  return cleaned.filter((c) => {
+    const key = c.name?.toLowerCase().trim() ?? "";
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export interface CostAnalysisData {

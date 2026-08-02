@@ -229,7 +229,7 @@ export default function CollegeDetail() {
                       />
                       <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                         {costComparisonData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'} />
+                          <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--destructive))' : '#16a34a'} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -382,10 +382,15 @@ export default function CollegeDetail() {
                               <span>{contact.phone}</span>
                             </div>
                           )}
-                          {contact.linkedinUrl && (
-                            <a href={contact.linkedinUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-[#0a66c2] hover:underline">
+                          {contact.name && (
+                            <a
+                              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.name + ' ' + (contact.institution ?? ''))}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-2 text-sm text-[#0a66c2] hover:underline"
+                            >
                               <Linkedin className="h-3 w-3" />
-                              <span>LinkedIn</span>
+                              <span>Search LinkedIn</span>
                             </a>
                           )}
                         </div>
