@@ -121,7 +121,7 @@ export default function SubjectSearch() {
               Top Targets for "{subject}"
             </h2>
             <div className="text-sm text-muted-foreground">
-              {results?.length || 0} institutions identified
+              {isLoading ? "Searching…" : `${results?.length ?? 0} institutions identified`}
             </div>
           </div>
 
