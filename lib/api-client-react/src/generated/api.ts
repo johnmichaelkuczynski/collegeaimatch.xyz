@@ -23,6 +23,8 @@ import type {
   College,
   CollegeSearchResult,
   CollegeStats,
+  CollegeUploadInput,
+  CollegeUploadResult,
   Contact,
   CostAnalysis,
   Course,
@@ -216,6 +218,154 @@ export function useSearchColleges<TData = Awaited<ReturnType<typeof searchColleg
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getSearchCollegesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadCollegeListUrl = () => {
+
+
+
+
+  return `/api/colleges/upload`
+}
+
+/**
+ * @summary Upload a CSV list of colleges to create a custom segment
+ */
+export const uploadCollegeList = async (collegeUploadInput: CollegeUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<CollegeUploadResult> => {
+
+  return customFetch<CollegeUploadResult>(getUploadCollegeListUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(collegeUploadInput)
+  }
+);}
+
+
+
+
+
+export const getUploadCollegeListMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadCollegeList>>, TError,{data: BodyType<CollegeUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadCollegeList>>, TError,{data: BodyType<CollegeUploadInput>}, TContext> => {
+
+const mutationKey = ['uploadCollegeList'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadCollegeList>>, {data: BodyType<CollegeUploadInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadCollegeList(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadCollegeListMutationResult = NonNullable<Awaited<ReturnType<typeof uploadCollegeList>>>
+    export type UploadCollegeListMutationBody = BodyType<CollegeUploadInput>
+    export type UploadCollegeListMutationError = ErrorType<void>
+
+    /**
+ * @summary Upload a CSV list of colleges to create a custom segment
+ */
+export const useUploadCollegeList = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadCollegeList>>, TError,{data: BodyType<CollegeUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadCollegeList>>,
+        TError,
+        {data: BodyType<CollegeUploadInput>},
+        TContext
+      > => {
+      return useMutation(getUploadCollegeListMutationOptions(options));
+    }
+
+export const getListCustomCollegesUrl = () => {
+
+
+
+
+  return `/api/colleges/custom`
+}
+
+/**
+ * @summary List all custom uploaded college segments
+ */
+export const listCustomColleges = async ( options?: Parameters<typeof customFetch>[1]): Promise<CollegeSearchResult> => {
+
+  return customFetch<CollegeSearchResult>(getListCustomCollegesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCustomCollegesQueryKey = () => {
+    return [
+    `/api/colleges/custom`
+    ] as const;
+    }
+
+
+export const getListCustomCollegesQueryOptions = <TData = Awaited<ReturnType<typeof listCustomColleges>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomColleges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCustomCollegesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCustomColleges>>> = ({ signal }) => listCustomColleges({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCustomColleges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCustomCollegesQueryResult = NonNullable<Awaited<ReturnType<typeof listCustomColleges>>>
+export type ListCustomCollegesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all custom uploaded college segments
+ */
+
+export function useListCustomColleges<TData = Awaited<ReturnType<typeof listCustomColleges>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomColleges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCustomCollegesQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

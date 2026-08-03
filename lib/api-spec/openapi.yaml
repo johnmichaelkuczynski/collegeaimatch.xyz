@@ -75,6 +75,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/CollegeSearchResult"
 
+  /colleges/upload:
+    post:
+      operationId: uploadCollegeList
+      tags: [colleges]
+      summary: Upload a CSV list of colleges to create a custom segment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollegeUploadInput"
+      responses:
+        "200":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollegeUploadResult"
+        "400":
+          description: Bad request
+
+  /colleges/custom:
+    get:
+      operationId: listCustomColleges
+      tags: [colleges]
+      summary: List all custom uploaded college segments
+      responses:
+        "200":
+          description: List of custom colleges
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollegeSearchResult"
+
   /colleges/{collegeId}:
     get:
       operationId: getCollege
@@ -629,6 +663,33 @@ components:
           items:
             $ref: "#/components/schemas/Course"
         executiveSummary:
+          type: string
+
+    CollegeUploadInput:
+      type: object
+      required: [csvContent]
+      properties:
+        csvContent:
+          type: string
+          description: Raw CSV text with columns name, state (optional), type (optional), city (optional)
+        filename:
+          type: string
+          description: Original filename, used as a segment label
+
+    CollegeUploadResult:
+      type: object
+      required: [inserted, skipped, total, sourceFile]
+      properties:
+        inserted:
+          type: number
+          description: Number of new colleges added
+        skipped:
+          type: number
+          description: Number of rows skipped (duplicates or invalid)
+        total:
+          type: number
+          description: Total rows processed
+        sourceFile:
           type: string
 
     DashboardSummary:

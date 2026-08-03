@@ -204,6 +204,23 @@ export interface GeneratedProposal {
   executiveSummary?: string;
 }
 
+export interface CollegeUploadInput {
+  /** Raw CSV text with columns name, state (optional), type (optional), city (optional) */
+  csvContent: string;
+  /** Original filename, used as a segment label */
+  filename?: string;
+}
+
+export interface CollegeUploadResult {
+  /** Number of new colleges added */
+  inserted: number;
+  /** Number of rows skipped (duplicates or invalid) */
+  skipped: number;
+  /** Total rows processed */
+  total: number;
+  sourceFile: string;
+}
+
 export type DashboardSummaryTopOpportunityStatesItem = {
   state: string;
   count: number;

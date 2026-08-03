@@ -61,6 +61,51 @@ export const SearchCollegesResponse = zod.object({
 
 
 /**
+ * @summary Upload a CSV list of colleges to create a custom segment
+ */
+export const UploadCollegeListBody = zod.object({
+  "csvContent": zod.string().describe('Raw CSV text with columns name, state (optional), type (optional), city (optional)'),
+  "filename": zod.string().optional().describe('Original filename, used as a segment label')
+})
+
+export const UploadCollegeListResponse = zod.object({
+  "inserted": zod.number().describe('Number of new colleges added'),
+  "skipped": zod.number().describe('Number of rows skipped (duplicates or invalid)'),
+  "total": zod.number().describe('Total rows processed'),
+  "sourceFile": zod.string()
+})
+
+
+/**
+ * @summary List all custom uploaded college segments
+ */
+export const ListCustomCollegesResponse = zod.object({
+  "colleges": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "type": zod.string().describe('community_college, lower_tier, technical, vocational, specialty, for_profit, four_year, university'),
+  "enrollmentSize": zod.number(),
+  "dropoutRate": zod.number().nullish().describe('Percentage (0-100)'),
+  "graduationRate": zod.number().nullish().describe('Percentage (0-100)'),
+  "avgGraduationYears": zod.number().nullish(),
+  "debtPayoffYears": zod.number().nullish().describe('Median years to pay off student debt, null if unlikely'),
+  "tuitionInState": zod.number().nullish(),
+  "tuitionOutOfState": zod.number().nullish(),
+  "accreditation": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "popularMajors": zod.array(zod.string()).optional(),
+  "aiOpportunityScore": zod.number().nullish().describe('Score 0-100 indicating how likely this college wants AI courses')
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
  * @summary Get college details
  */
 export const GetCollegeParams = zod.object({

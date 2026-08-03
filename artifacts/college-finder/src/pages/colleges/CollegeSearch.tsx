@@ -1,8 +1,9 @@
 import * as React from "react"
 import { Link } from "wouter"
-import { Search, SlidersHorizontal, MapPin, Building, GraduationCap, DollarSign, ChevronRight } from "lucide-react"
+import { Search, MapPin, Building, GraduationCap, ChevronRight, Upload, CheckCircle2, AlertCircle, Loader2, FileUp, X } from "lucide-react"
 
-import { useSearchColleges } from "@workspace/api-client-react"
+import { useSearchColleges, getSearchCollegesQueryKey } from "@workspace/api-client-react"
+import { useQueryClient } from "@tanstack/react-query"
 import { formatNumber, formatPercent, cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { buttonVariants, Button } from "@/components/ui/button"
@@ -11,7 +12,6 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 
 const INSTITUTION_TYPES = [
@@ -30,12 +30,63 @@ const STATES = [
   "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
 ]
 
+type UploadStatus =
+  | { phase: "idle" }
+  | { phase: "uploading" }
+  | { phase: "success"; inserted: number; skipped: number; filename: string }
+  | { phase: "error"; message: string }
+
 export default function CollegeSearch() {
   const [query, setQuery] = React.useState("")
   const [type, setType] = React.useState("all")
   const [state, setState] = React.useState("all")
   const [maxDropout, setMaxDropout] = React.useState([100])
   const [page, setPage] = React.useState(1)
+
+  // CSV upload state
+  const [uploadStatus, setUploadStatus] = React.useState<UploadStatus>({ phase: "idle" })
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadStatus({ phase: "uploading" })
+
+    try {
+      const csvContent = await file.text()
+      const res = await fetch("/api/colleges/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvContent, filename: file.name }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(err.error || "Upload failed")
+      }
+
+      const data = await res.json()
+      setUploadStatus({
+        phase: "success",
+        inserted: data.inserted,
+        skipped: data.skipped,
+        filename: file.name,
+      })
+
+      // Reset file input and refresh search so newly uploaded colleges appear
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      await queryClient.invalidateQueries({ queryKey: getSearchCollegesQueryKey() })
+    } catch (err) {
+      setUploadStatus({
+        phase: "error",
+        message: err instanceof Error ? err.message : "Upload failed",
+      })
+    }
+  }
+
+  const dismissUpload = () => setUploadStatus({ phase: "idle" })
 
   // Use a debounced search term for the query to avoid spamming the API
   const [debouncedQuery, setDebouncedQuery] = React.useState("")
@@ -151,6 +202,68 @@ export default function CollegeSearch() {
             </div>
           </div>
         </div>
+
+        {/* CSV Upload Section */}
+        <div className="pt-4 border-t space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">Upload College List</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Import a custom CSV segment. Requires a <code className="bg-muted px-1 rounded text-[11px]">name</code> column; optional: <code className="bg-muted px-1 rounded text-[11px]">state</code>, <code className="bg-muted px-1 rounded text-[11px]">type</code>, <code className="bg-muted px-1 rounded text-[11px]">city</code>.
+            </p>
+          </div>
+
+          {uploadStatus.phase === "idle" && (
+            <label className={cn(
+              "flex items-center gap-2 cursor-pointer rounded-md border border-dashed px-3 py-2.5",
+              "text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+            )}>
+              <FileUp className="h-4 w-4 shrink-0" />
+              <span>Choose CSV file…</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                onChange={handleFileSelect}
+              />
+            </label>
+          )}
+
+          {uploadStatus.phase === "uploading" && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+              <span>Uploading…</span>
+            </div>
+          )}
+
+          {uploadStatus.phase === "success" && (
+            <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-sm text-emerald-800 flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{uploadStatus.filename}</p>
+                <p className="text-xs text-emerald-700">
+                  {uploadStatus.inserted} added, {uploadStatus.skipped} skipped
+                </p>
+              </div>
+              <button onClick={dismissUpload} className="text-emerald-600 hover:text-emerald-800 shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {uploadStatus.phase === "error" && (
+            <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-800 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">Upload failed</p>
+                <p className="text-xs text-red-700">{uploadStatus.message}</p>
+              </div>
+              <button onClick={dismissUpload} className="text-red-600 hover:text-red-800 shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Results Area */}
@@ -208,13 +321,19 @@ export default function CollegeSearch() {
               <Card key={college.id} className="hover-elevate transition-all border-l-4 hover:border-l-primary group">
                 <CardContent className="p-5 flex flex-col md:flex-row gap-6 md:items-center">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <Link href={`/colleges/${college.id}`}>
                         <h3 className="text-lg font-bold truncate hover:underline cursor-pointer">
                           {college.name}
                         </h3>
                       </Link>
-                      {college.aiOpportunityScore && college.aiOpportunityScore >= 80 && (
+                      {(college as { isCustom?: boolean }).isCustom && (
+                        <Badge variant="outline" className="shrink-0 bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200 gap-1">
+                          <Upload className="h-3 w-3" />
+                          Custom
+                        </Badge>
+                      )}
+                      {!((college as { isCustom?: boolean }).isCustom) && college.aiOpportunityScore && college.aiOpportunityScore >= 80 && (
                         <Badge variant="success" className="shrink-0 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-emerald-200">
                           Hot Lead
                         </Badge>
