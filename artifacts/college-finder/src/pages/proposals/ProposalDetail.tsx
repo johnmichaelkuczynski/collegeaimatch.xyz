@@ -1,7 +1,8 @@
 import * as React from "react"
 import { useParams, Link } from "wouter"
-import { ArrowLeft, Download, Send, Copy, FileText, CheckCircle2, TrendingUp, AlertCircle, Building } from "lucide-react"
+import { ArrowLeft, Download, Send, Copy, FileText, CheckCircle2, TrendingUp, AlertCircle, Building, Loader2 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
+import { pdf } from "@react-pdf/renderer"
 
 import { useGetProposal, getGetProposalQueryKey } from "@workspace/api-client-react"
 import { formatCurrency, formatNumber, formatPercent, cn } from "@/lib/utils"
@@ -10,14 +11,34 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ProposalPDF } from "./ProposalPDF"
 
 export default function ProposalDetail() {
   const params = useParams()
   const id = Number(params.id)
+  const [pdfLoading, setPdfLoading] = React.useState(false)
 
   const { data: proposal, isLoading } = useGetProposal(id, {
     query: { enabled: !isNaN(id), queryKey: getGetProposalQueryKey(id) }
   })
+
+  async function handleDownloadPdf() {
+    if (!proposal) return
+    setPdfLoading(true)
+    try {
+      const blob = await pdf(<ProposalPDF proposal={proposal} />).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `Proposal-${proposal.collegeName.replace(/\s+/g, "-")}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   if (isLoading) {
     return <div className="p-8 max-w-5xl mx-auto space-y-4">
@@ -59,7 +80,11 @@ export default function ProposalDetail() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline"><Copy className="mr-2 h-4 w-4" /> Copy Link</Button>
-          <Button variant="outline"><Download className="mr-2 h-4 w-4" /> PDF</Button>
+          <Button variant="outline" onClick={handleDownloadPdf} disabled={pdfLoading}>
+            {pdfLoading
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
+              : <><Download className="mr-2 h-4 w-4" /> Download PDF</>}
+          </Button>
           <Button><Send className="mr-2 h-4 w-4" /> Send Email</Button>
         </div>
       </div>
