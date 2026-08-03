@@ -1,9 +1,9 @@
 import * as React from "react"
 import { useParams, Link, useLocation } from "wouter"
 import { 
-  Building, GraduationCap, MapPin, ExternalLink, Download, AlertTriangle, 
-  UserCircle, Mail, Phone, Linkedin, DollarSign, TrendingUp, TrendingDown,
-  ArrowRight, CheckCircle2
+  Building, GraduationCap, MapPin, ExternalLink, AlertTriangle, 
+  UserCircle, Mail, Phone, Linkedin, TrendingUp, TrendingDown,
+  ArrowRight, FileText, X
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts"
 
@@ -15,13 +15,18 @@ import {
   useGetCollegeCostAnalysis, getGetCollegeCostAnalysisQueryKey,
   useGenerateProposal 
 } from "@workspace/api-client-react"
+import type { Course } from "@workspace/api-client-react"
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils"
+import { estimateCourseCosts, isCommunityCollege } from "@/lib/courseCosts"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+} from "@/components/ui/dialog"
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -29,6 +34,7 @@ export default function CollegeDetail() {
   const params = useParams()
   const id = params.id as string
   const [, setLocation] = useLocation()
+  const [pitchCourse, setPitchCourse] = React.useState<Course | null>(null)
 
   const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
@@ -52,31 +58,32 @@ export default function CollegeDetail() {
 
   const generateProposal = useGenerateProposal()
 
-  const handleGenerateProposal = () => {
+  const handleGenerateProposal = (singleCourse?: Course) => {
     if (!college) return
-    
-    // In a real app we might pass the full context or just the ID to the server.
-    // The server does the actual generation.
-    generateProposal.mutate({
-      data: {
-        collegeId: college.id,
-        collegeName: college.name,
-        collegeState: college.state,
-        collegeType: college.type,
-        enrollmentSize: college.enrollmentSize,
-        dropoutRate: college.dropoutRate || undefined,
-        courses: courses,
-        contacts: contacts,
-        costAnalysis: costAnalysis
+    const data = {
+      collegeId: college.id,
+      collegeName: college.name,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      collegeCity: (college as any).city ?? "",
+      collegeState: college.state,
+      collegeType: college.type,
+      enrollmentSize: college.enrollmentSize,
+      dropoutRate: college.dropoutRate || undefined,
+      courses: singleCourse ? [singleCourse] : courses,
+      contacts: contacts,
+      costAnalysis: costAnalysis,
+      ...(singleCourse ? { pitchMode: true } : {}),
+    }
+    generateProposal.mutate(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { data: data as any },
+      {
+        onSuccess: () => {
+          setPitchCourse(null)
+          setLocation("/proposals")
+        }
       }
-    }, {
-      onSuccess: (data) => {
-        // Redirect to a local proposal builder or show success.
-        // Assuming we'd save it and redirect to /proposals/:id
-        // For this frontend demo, we'll just redirect to /proposals to simulate success.
-        setLocation("/proposals")
-      }
-    })
+    )
   }
 
   if (isLoadingCollege) {
@@ -114,6 +121,8 @@ export default function CollegeDetail() {
     )
   }
 
+  const isCommunity = isCommunityCollege(college.type)
+
   const costComparisonData = costAnalysis ? [
     { name: 'Current Costs', value: costAnalysis.totalCostWithoutAI },
     { name: 'With AI Integration', value: costAnalysis.totalCostWithAI }
@@ -124,6 +133,15 @@ export default function CollegeDetail() {
     { name: 'Attrition & Equity Gap', value: costAnalysis.attritionCost },
     { name: 'Benchmarking', value: costAnalysis.benchmarkingCost }
   ] : []
+
+  // Pitch Dialog — costs for the selected course
+  const pitchEstimate = pitchCourse
+    ? estimateCourseCosts(
+        pitchCourse.estimatedEnrollment ?? 0,
+        (pitchCourse.failRate ?? 0) / 100,
+        isCommunity
+      )
+    : null
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-12">
@@ -197,7 +215,13 @@ export default function CollegeDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {courses.map((course, i) => (
+                  {courses.map((course, i) => {
+                    const est = estimateCourseCosts(
+                      course.estimatedEnrollment ?? 0,
+                      (course.failRate ?? 0) / 100,
+                      isCommunity
+                    )
+                    return (
                     <TableRow key={i} className={course.isHighPriority ? "bg-primary/5" : ""}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -217,18 +241,25 @@ export default function CollegeDetail() {
                         ) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {course.estimatedAnnualCost ? formatCurrency(course.estimatedAnnualCost) : '-'}
+                        {formatCurrency(est.directCost)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-emerald-600">
-                        {course.aiAnnualCost ? formatCurrency(course.aiAnnualCost) : '-'}
+                      <TableCell className="text-right font-mono text-emerald-600 font-semibold">
+                        {formatCurrency(est.zhiAnnual)}
                       </TableCell>
                       <TableCell>
-                        {course.isHighPriority && (
-                          <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-100">Hot</Badge>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs font-semibold border-primary/40 text-primary hover:bg-primary/10"
+                          onClick={() => setPitchCourse(course)}
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          Pitch
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -431,18 +462,103 @@ export default function CollegeDetail() {
         </TabsContent>
       </Tabs>
 
-      {/* CTA FOOTER */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/80 backdrop-blur-md border-t flex justify-end z-10 shadow-lg">
+      {/* CTA FOOTER — full multi-course proposal */}
+      <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/80 backdrop-blur-md border-t flex items-center justify-between z-10 shadow-lg">
+        <p className="text-xs text-muted-foreground hidden md:block">
+          Full proposal targets all {courses?.length || 0} courses · use <strong>Pitch</strong> on a row for a single-course pitch
+        </p>
         <Button 
           size="lg" 
           className="font-bold px-8 shadow-md"
-          onClick={handleGenerateProposal}
+          onClick={() => handleGenerateProposal()}
           disabled={generateProposal.isPending || !costAnalysis || !courses}
         >
-          {generateProposal.isPending ? "Generating..." : "Generate Proposal"}
+          {generateProposal.isPending ? "Generating..." : "Generate Full Proposal"}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
+
+      {/* SINGLE-COURSE PITCH DIALOG */}
+      <Dialog open={!!pitchCourse} onOpenChange={(open) => { if (!open) setPitchCourse(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg leading-snug">
+              {pitchCourse?.name}
+              <span className="block text-sm font-normal text-muted-foreground mt-0.5">
+                {college.name}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Single-course cost breakdown and pitch proposal
+            </DialogDescription>
+          </DialogHeader>
+
+          {pitchEstimate && (
+            <div className="space-y-6 pt-2">
+              {/* Three-number story */}
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-4 py-3 border-b">
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Teaching this course now</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Instructor pay only</div>
+                  </div>
+                  <div className="text-xl font-mono font-bold text-destructive shrink-0">
+                    ~{formatCurrency(pitchEstimate.directCost)}<span className="text-sm font-normal">/yr</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 py-3 border-b">
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">True cost once failures are counted</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Includes retakes + dropout revenue loss</div>
+                  </div>
+                  <div className="text-xl font-mono font-bold text-destructive shrink-0">
+                    ~{formatCurrency(pitchEstimate.totalCost)}<span className="text-sm font-normal">/yr</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg px-3">
+                  <div>
+                    <div className="text-sm font-bold text-emerald-800 dark:text-emerald-400">With Zhi</div>
+                    <div className="text-xs text-emerald-700 dark:text-emerald-500 mt-0.5">
+                      + {formatCurrency(pitchEstimate.zhiSetup)} one-time setup
+                    </div>
+                  </div>
+                  <div className="text-2xl font-mono font-black text-emerald-700 dark:text-emerald-400 shrink-0">
+                    {formatCurrency(pitchEstimate.zhiAnnual)}<span className="text-sm font-normal">/yr</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Savings call-out */}
+              <div className="text-center text-sm text-muted-foreground">
+                Saves <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                  {formatCurrency(pitchEstimate.totalCost - pitchEstimate.zhiAnnual)}
+                </span> every year after setup
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setPitchCourse(null)}
+                >
+                  <X className="h-4 w-4 mr-1" /> Close
+                </Button>
+                <Button
+                  className="flex-1 font-bold"
+                  onClick={() => handleGenerateProposal(pitchCourse!)}
+                  disabled={generateProposal.isPending}
+                >
+                  {generateProposal.isPending ? "Generating…" : "Generate Pitch Proposal"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

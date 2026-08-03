@@ -424,6 +424,156 @@ Use the numeric index (0, 1, 2…) as the collegeId. Estimate realistic enrollme
   return parsed.rankings ?? [];
 }
 
+// ── Single-course pitch report ────────────────────────────────────────────────
+// Mirrors the constants in artifacts/college-finder/src/lib/courseCosts.ts.
+// Keep in sync if either side changes.
+
+const PITCH_COST_PER_STUDENT_COMMUNITY = 150;
+const PITCH_COST_PER_STUDENT_UNIVERSITY = 300;
+const PITCH_DROPOUT_SHARE = 0.25;
+const PITCH_LOST_REVENUE = 3_000;
+const PITCH_ZHI_ANNUAL = 18_000;
+const PITCH_ZHI_SETUP = 85_000;
+
+function roundDown5k(n: number): number {
+  return Math.floor(n / 5_000) * 5_000;
+}
+
+export interface SingleCoursePitchCostAnalysis {
+  directCost: number;
+  retakeCost: number;
+  dropoutLoss: number;
+  totalCost: number;
+  zhiAnnual: number;
+  zhiSetup: number;
+  savingsVsDirect: number;
+  savingsVsTrue: number;
+  savingsYear1: number;
+}
+
+export function computeSingleCoursePitchNumbers(
+  course: CourseData,
+  collegeType: string
+): SingleCoursePitchCostAnalysis {
+  const isCommunity = collegeType.toLowerCase().includes("community") ||
+    collegeType.toLowerCase().includes("junior") ||
+    collegeType.toLowerCase().includes("technical");
+  const costPerStudent = isCommunity ? PITCH_COST_PER_STUDENT_COMMUNITY : PITCH_COST_PER_STUDENT_UNIVERSITY;
+  const enrollment = course.estimatedEnrollment ?? 100;
+  const failRateDecimal = (course.failRate ?? 0) / 100;
+
+  const rawDirectCost  = enrollment * costPerStudent;
+  const rawRetakeCost  = rawDirectCost * failRateDecimal;
+  const rawDropoutLoss = enrollment * failRateDecimal * PITCH_DROPOUT_SHARE * PITCH_LOST_REVENUE;
+  const rawTotalCost   = rawDirectCost * (1 + failRateDecimal) + rawDropoutLoss;
+
+  const directCost  = roundDown5k(rawDirectCost);
+  const retakeCost  = roundDown5k(rawRetakeCost);
+  const dropoutLoss = roundDown5k(rawDropoutLoss);
+  const totalCost   = roundDown5k(rawTotalCost);
+
+  return {
+    directCost,
+    retakeCost,
+    dropoutLoss,
+    totalCost,
+    zhiAnnual:       PITCH_ZHI_ANNUAL,
+    zhiSetup:        PITCH_ZHI_SETUP,
+    savingsVsDirect: directCost  - PITCH_ZHI_ANNUAL,
+    savingsVsTrue:   totalCost   - PITCH_ZHI_ANNUAL,
+    savingsYear1:    totalCost   - PITCH_ZHI_ANNUAL - PITCH_ZHI_SETUP,
+  };
+}
+
+export async function generateSingleCoursePitch(
+  college: CollegeInfo,
+  course: CourseData,
+): Promise<string> {
+  const nums = computeSingleCoursePitchNumbers(course, college.type);
+  const { directCost, retakeCost, dropoutLoss, totalCost, zhiAnnual, zhiSetup,
+          savingsVsDirect, savingsVsTrue, savingsYear1 } = nums;
+  const failPct = course.failRate ?? 0;
+  const enrollment = course.estimatedEnrollment ?? 100;
+  const isCommunity = college.type.toLowerCase().includes("community") ||
+    college.type.toLowerCase().includes("junior");
+
+  // One AI call — returns five tight paragraphs separated by blank lines
+  const systemPrompt = `You are a senior analyst at Zhi Systems writing a tight, data-driven cost analysis report. Write exactly five short sections. Each section is 2-4 sentences maximum. Be specific to the institution and course. Do not include labels or headers — just the paragraph text. Separate sections with a single blank line. Use only the numbers you are given — do not invent or alter any figures. Tone: authoritative, direct, understated. No marketing language.`;
+
+  const userPrompt = `Write five narrative sections for a cost analysis of ${course.name} at ${college.name} (${college.state}).
+
+Verified numbers — use exactly as given:
+  Enrollment in this course:  ${enrollment.toLocaleString()} students/yr
+  Fail rate:                  ${failPct}%
+  Direct teaching cost:       $${directCost.toLocaleString()}/yr
+  Retake cycle adds:          +$${retakeCost.toLocaleString()}/yr
+  Dropout revenue loss:       +$${dropoutLoss.toLocaleString()}/yr
+  True annual cost:           ≈$${totalCost.toLocaleString()}/yr
+  Zhi annual license:         $${zhiAnnual.toLocaleString()}/yr (flat, no per-seat)
+  Zhi one-time setup:         $${zhiSetup.toLocaleString()}
+  Savings vs teaching line:   $${savingsVsDirect.toLocaleString()}/yr
+  Savings vs true cost:       ≈$${savingsVsTrue.toLocaleString()}/yr
+  Year-one net saving:        $${savingsYear1.toLocaleString()} (after setup)
+
+Write these five sections in order, blank line between each:
+1. THE BOTTOM LINE — Name the course and college. One paragraph: what the college pays now (the visible line and the true cost once failures are counted), and what Zhi charges. Make the contrast stark.
+2. WHAT YOU SPEND NOW — One paragraph: explain the $${directCost.toLocaleString()} figure in human terms. Describe how the course is delivered — sections, students, ${isCommunity ? "adjunct" : "faculty"} pay. Establish this as the number that appears in the budget.
+3. HIDDEN COST PARAGRAPH — One paragraph to appear after the breakdown table. Do not repeat the table numbers. Explain the logic: why retakes add cost, and why dropout revenue loss is larger than the teaching line. Reference the ${failPct}% fail rate and the human reality of students who stop out.
+4. WHAT YOU SPEND WITH ZHI — One paragraph: what Zhi delivers (AI-powered course in Canvas, embedded diagnostics that verify competency, not just record pass/fail). Flat $${zhiAnnual.toLocaleString()}/yr, $${zhiSetup.toLocaleString()} one-time. No per-seat metering.
+5. THE SAVINGS — One paragraph: quote $${savingsVsDirect.toLocaleString()} saved vs the teaching line and ≈$${savingsVsTrue.toLocaleString()} saved vs the true cost, on a single course. Note that year one nets $${savingsYear1.toLocaleString()} even after the setup fee.`;
+
+  const raw = await openaiChat(systemPrompt, userPrompt, false); // plain text, not JSON
+  const paras = raw.trim().split(/\n\n+/);
+  const [p1, p2, p3, p4, p5] = paras.map((p) => p.trim());
+
+  const fmt = (n: number) => `$${n.toLocaleString()}`;
+  const cityPart = college.city ? `${college.city}, ` : "";
+
+  const report = [
+    "ZHI SYSTEMS\n",
+    "Course Cost & Modernization Analysis\n",
+    "\n\n",
+    `${course.name}\n`,
+    `${college.name}  ·  ${cityPart}${college.state}  ·  ~${college.enrollmentSize.toLocaleString()} students  ·  ~${enrollment.toLocaleString()} enrolled / yr  ·  ${failPct}% fail rate\n`,
+    "\n",
+    "Teaching this course today\n\n",
+    `~${fmt(directCost)} / year\n`,
+    "\n",
+    "True cost once failures are counted\n\n",
+    `~${fmt(totalCost)} / year\n`,
+    "\n",
+    "With Zhi\n\n",
+    `${fmt(zhiAnnual)} / year\n`,
+    "\n\n",
+    "The bottom line\n\n",
+    (p1 ?? "") + "\n",
+    "\n",
+    "What you spend now\n\n",
+    (p2 ?? "") + "\n",
+    "\n",
+    "The cost the budget line hides\n\n",
+    `Direct teaching (~${enrollment.toLocaleString()} students × section cost)\t${fmt(directCost)}\n`,
+    `Add one retake cycle (${failPct}% fail and repeat)\t+ ${fmt(retakeCost)}\n`,
+    `Add lost tuition from students who fail and drop out\t+ ${fmt(dropoutLoss)}\n`,
+    `True annual cost to the college\t≈ ${fmt(totalCost)}\n`,
+    "\n",
+    (p3 ?? "") + "\n",
+    "\n",
+    "What you spend with Zhi\n\n",
+    (p4 ?? "") + "\n",
+    "\n",
+    "The savings\n\n",
+    (p5 ?? "") + "\n",
+    "\n\n",
+    "Methodology\n\n",
+    `Figures are conservative estimates built from published ${isCommunity ? "community-college" : "university"} section costs and this course's enrollment and fail rate. Every assumption is set to the low end: direct cost assumes ${isCommunity ? "adjunct-taught sections" : "standard faculty section rates"}; the dropout share counts only a quarter of failing students; lost revenue is valued at roughly one year of in-district tuition. Dollar figures are rounded down.\n`,
+    "\n",
+    "Zhi Systems  —  zhi@zhisystems.org",
+  ].join("");
+
+  return report;
+}
+
 export async function generatePopularMajors(
   college: CollegeInfo
 ): Promise<string[]> {

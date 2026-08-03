@@ -12,6 +12,8 @@ import {
   generateCostAnalysis,
   generateCourses,
   generateContacts,
+  generateSingleCoursePitch,
+  computeSingleCoursePitchNumbers,
   type CollegeInfo,
   type CourseData,
 } from "../lib/aiClient";
@@ -59,10 +61,15 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
   }
   const input = parsed.data;
 
+  // Read fields that aren't in the Zod schema before parse strips them
+  const rawBody = req.body as Record<string, unknown>;
+  const pitchMode = rawBody.pitchMode === true;
+  const collegeCity = typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";
+
   try {
     const collegeInfo: CollegeInfo = {
       name: input.collegeName,
-      city: "",
+      city: collegeCity,
       state: input.collegeState,
       type: input.collegeType ?? "four_year",
       enrollmentSize: input.enrollmentSize ?? 5000,
@@ -75,6 +82,38 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
     if (courses.length === 0) {
       courses = await generateCourses(collegeInfo);
     }
+
+    // ── Single-course pitch path ─────────────────────────────────────────────
+    if (pitchMode && courses.length === 1) {
+      const course = courses[0];
+      const outreachLetter = await generateSingleCoursePitch(collegeInfo, course);
+
+      // Build a CostAnalysisData-shaped object from the pitch formula numbers
+      const nums = computeSingleCoursePitchNumbers(course, collegeInfo.type);
+      const pitchCostAnalysis = {
+        collegeName: input.collegeName,
+        courses,
+        totalCurrentAnnualCost: nums.directCost,
+        totalAiInstallCost: nums.zhiSetup,
+        totalAiAnnualCost: nums.zhiAnnual,
+        attritionCost: nums.dropoutLoss,
+        benchmarkingCost: 0,
+        totalCostWithoutAI: nums.totalCost,
+        totalCostWithAI: nums.zhiAnnual + nums.zhiSetup,
+        savingsYear1: nums.savingsYear1,
+        savingsAnnual: nums.savingsVsTrue,
+      };
+
+      res.json({
+        outreachLetter,
+        costAnalysis: pitchCostAnalysis,
+        prioritizedCourses: courses,
+        executiveSummary: `Single-course pitch: ${course.name} at ${input.collegeName}. Saves ≈$${nums.savingsVsTrue.toLocaleString()} per year vs true cost. Zhi price: $${nums.zhiAnnual.toLocaleString()}/yr + $${nums.zhiSetup.toLocaleString()} one-time.`,
+      });
+      return;
+    }
+
+    // ── Full multi-course proposal path ──────────────────────────────────────
 
     // Use provided contacts or generate them
     let contacts = (input.contacts ?? []) as Awaited<ReturnType<typeof generateContacts>>;
