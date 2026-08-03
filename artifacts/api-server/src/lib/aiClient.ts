@@ -98,7 +98,9 @@ export interface CourseData {
   sections: number;
   failRate: number;
   estimatedAnnualCost: number;
+  /** One-time AI setup cost — always $30,000 */
   aiInstallCost: number;
+  /** Annual AI maintenance cost — always 15% of estimatedAnnualCost */
   aiAnnualCost: number;
   isHighPriority: boolean;
 }
@@ -119,9 +121,10 @@ export async function generateCourses(
 ): Promise<CourseData[]> {
   const systemPrompt = `You are an expert in higher education curriculum and AI-powered course delivery.
 Generate realistic course data for a college. Return a JSON object with a "courses" array.
-Each course must include: name, subject, description, estimatedEnrollment, sections, failRate (%), estimatedAnnualCost ($), aiInstallCost ($), aiAnnualCost ($), isHighPriority (bool).
+Each course must include: name, subject, description, estimatedEnrollment, sections, failRate (%), estimatedAnnualCost ($), isHighPriority (bool).
+Do NOT include aiInstallCost or aiAnnualCost — those are calculated separately.
 Focus on courses with high enrollment or high fail rates — those are prime AI replacement candidates.
-AI costs should be roughly 30-50% lower than current delivery costs for install, and 15-25% for annual maintenance.`;
+estimatedAnnualCost should reflect credit hours × sections × instructor salary/benefits overhead for a human-taught course.`;
 
   const userPrompt = `College: ${college.name} (${college.city}, ${college.state})
 Type: ${college.type}
@@ -131,11 +134,19 @@ Tuition (in-state): ${college.tuitionInState ? `$${college.tuitionInState.toLoca
 ${subject ? `Focus on subject area: ${subject}` : "Generate the 12-15 most important AI-candidate courses for this institution type"}
 
 Generate realistic, institution-specific course data. Include both general education gateway courses (Ethics, Critical Thinking, Remedial Math, Psychology 101, Composition) and programs relevant to this type of school.
-Annual cost should reflect credit hours * sections * instructor salary/benefits overhead.`;
+estimatedAnnualCost should reflect instructor salaries + benefits overhead for all sections of that course combined.`;
 
   const raw = await openaiChat(systemPrompt, userPrompt);
   const parsed = JSON.parse(raw) as { courses: CourseData[] };
-  return parsed.courses ?? [];
+  const courses = parsed.courses ?? [];
+
+  // Compute AI costs deterministically — never trust AI-generated cost numbers.
+  // $30,000 one-time setup per course; annual maintenance = 15% of human delivery cost.
+  return courses.map((c) => ({
+    ...c,
+    aiInstallCost: 30_000,
+    aiAnnualCost: Math.round((c.estimatedAnnualCost ?? 0) * 0.15),
+  }));
 }
 
 export async function generateContacts(
