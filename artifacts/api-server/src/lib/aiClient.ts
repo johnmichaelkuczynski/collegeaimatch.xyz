@@ -153,10 +153,12 @@ Apply the cost-per-section benchmarks for this institution type strictly.`;
   // Compute AI costs using Zhi Systems' verified rate card (Fresno State benchmark).
   // Flat fee per course — NOT enrollment-scaled, NOT a percentage of current cost.
   // Source: empirically verified proposal for Cal State Fresno Developmental Mathematics.
+  //   Setup:   $85,000 one-time (Canvas integration + courseware build)
+  //   License: $18,000/year flat (no per-seat metering, no enrollment escalation)
   return courses.map((c) => ({
     ...c,
     aiInstallCost: 85_000,   // one-time courseware build & Canvas integration
-    aiAnnualCost:  42_000,   // flat annual license per course
+    aiAnnualCost:  18_000,   // flat annual license per course
   }));
 }
 

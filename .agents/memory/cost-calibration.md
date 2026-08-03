@@ -3,17 +3,18 @@ name: AI cost calibration
 description: Real cost benchmarks and Zhi Systems rate card used in the course cost model.
 ---
 
-## Verified benchmark — Fresno State Developmental Math
-- Current annual delivery: ~$780,000 (state university, high enrollment)
-- Zhi Systems courseware price: $85,000 one-time install + $42,000/year license
-- With diagnostics add-on: $113,000 install + $60,000/year
+## Verified benchmark — Fresno State Developmental Math (authoritative)
+- Current annual delivery: ~$500,000 (~90 sections/yr at CSU section rates)
+- Zhi Systems setup: $85,000 one-time
+- Zhi Systems annual license: $18,000/year (flat, no per-seat, no enrollment escalation)
+- Year-1 total: $103,000. Saves ~$397,000 year 1, ~$482,000 every year after.
 
 ## Zhi Systems rate card (hardcoded in generateCourses post-processing)
 - `aiInstallCost` = **$85,000** flat per course (Canvas-ready courseware build)
-- `aiAnnualCost` = **$42,000** flat per course (annual license, no per-seat metering)
+- `aiAnnualCost` = **$18,000** flat per course (annual license, no per-seat metering)
 - These are FIXED, not enrollment-scaled, not a percentage of current cost.
 
-**Why:** User confirmed these are empirically verified numbers from an actual Fresno State proposal. Previous model (15% of current cost) and earlier model ($30K/$10K) were both wrong.
+**Why:** Second Fresno State document is the authoritative benchmark. First document ($42K/yr) was incorrect per user. Earlier models (15% or $10K/yr) were also wrong.
 
 **How to apply:** In `generateCourses` in `aiClient.ts`, after parsing AI response, always override with these fixed values. Never let the AI generate cost fields.
 
