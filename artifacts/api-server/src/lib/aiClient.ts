@@ -119,12 +119,21 @@ export async function generateCourses(
   college: CollegeInfo,
   subject?: string
 ): Promise<CourseData[]> {
-  const systemPrompt = `You are an expert in higher education curriculum and AI-powered course delivery.
+  const systemPrompt = `You are an expert in higher education curriculum and labor economics.
 Generate realistic course data for a college. Return a JSON object with a "courses" array.
 Each course must include: name, subject, description, estimatedEnrollment, sections, failRate (%), estimatedAnnualCost ($), isHighPriority (bool).
 Do NOT include aiInstallCost or aiAnnualCost — those are calculated separately.
-Focus on courses with high enrollment or high fail rates — those are prime AI replacement candidates.
-estimatedAnnualCost should reflect credit hours × sections × instructor salary/benefits overhead for a human-taught course.`;
+
+CRITICAL — use these real-world instructor cost benchmarks for estimatedAnnualCost:
+- Community college section: $3,500–$5,500 (mostly adjuncts; some FT faculty prorated)
+- State/regional university section: $5,000–$9,000 (mix of FT and adjunct)
+- Private/liberal-arts college section: $8,000–$14,000 (primarily FT faculty)
+- estimatedAnnualCost = sections × avg_cost_per_section for that institution type
+- A 30-section community college course costs roughly $105,000–$165,000 total — never $300,000+
+- DO NOT inflate. Real community college course delivery costs $60,000–$200,000/year for high-enrollment courses.
+- Verified benchmark: Fresno State's Developmental Math (~780 students, state university) = $780,000/year. Community colleges cost proportionally less.
+
+Focus on courses with high enrollment or high fail rates — those are prime AI replacement candidates.`;
 
   const userPrompt = `College: ${college.name} (${college.city}, ${college.state})
 Type: ${college.type}
@@ -133,19 +142,21 @@ Dropout rate: ${college.dropoutRate ? `${college.dropoutRate.toFixed(1)}%` : "un
 Tuition (in-state): ${college.tuitionInState ? `$${college.tuitionInState.toLocaleString()}` : "unknown"}
 ${subject ? `Focus on subject area: ${subject}` : "Generate the 12-15 most important AI-candidate courses for this institution type"}
 
-Generate realistic, institution-specific course data. Include both general education gateway courses (Ethics, Critical Thinking, Remedial Math, Psychology 101, Composition) and programs relevant to this type of school.
-estimatedAnnualCost should reflect instructor salaries + benefits overhead for all sections of that course combined.`;
+Include general education gateway courses (Remedial Math, Composition I, Intro to Psychology, Ethics, Critical Thinking) plus programs specific to this institution type.
+Use realistic section counts based on enrollment and typical class sizes (25–35 students/section).
+Apply the cost-per-section benchmarks for this institution type strictly.`;
 
   const raw = await openaiChat(systemPrompt, userPrompt);
   const parsed = JSON.parse(raw) as { courses: CourseData[] };
   const courses = parsed.courses ?? [];
 
-  // Compute AI costs deterministically — never trust AI-generated cost numbers.
-  // $30,000 one-time setup per course; annual maintenance = 15% of human delivery cost.
+  // Compute AI costs using Zhi Systems' verified rate card (Fresno State benchmark).
+  // Flat fee per course — NOT enrollment-scaled, NOT a percentage of current cost.
+  // Source: empirically verified proposal for Cal State Fresno Developmental Mathematics.
   return courses.map((c) => ({
     ...c,
-    aiInstallCost: 30_000,
-    aiAnnualCost: Math.round((c.estimatedAnnualCost ?? 0) * 0.15),
+    aiInstallCost: 85_000,   // one-time courseware build & Canvas integration
+    aiAnnualCost:  42_000,   // flat annual license per course
   }));
 }
 
