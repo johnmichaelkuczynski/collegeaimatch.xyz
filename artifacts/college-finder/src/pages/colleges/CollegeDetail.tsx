@@ -13,7 +13,8 @@ import {
   useGetCollegeContacts, getGetCollegeContactsQueryKey,
   useGetCollegeStats, getGetCollegeStatsQueryKey,
   useGetCollegeCostAnalysis, getGetCollegeCostAnalysisQueryKey,
-  useGenerateProposal 
+  useGenerateProposal,
+  useCreateProposal,
 } from "@workspace/api-client-react"
 import type { Course } from "@workspace/api-client-react"
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils"
@@ -57,10 +58,11 @@ export default function CollegeDetail() {
   })
 
   const generateProposal = useGenerateProposal()
+  const saveProposal = useCreateProposal()
 
   const handleGenerateProposal = (singleCourse?: Course) => {
     if (!college) return
-    const data = {
+    const generateData = {
       collegeId: college.id,
       collegeName: college.name,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,12 +78,31 @@ export default function CollegeDetail() {
     }
     generateProposal.mutate(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { data: data as any },
+      { data: generateData as any },
       {
-        onSuccess: () => {
-          setPitchCourse(null)
-          setLocation("/proposals")
-        }
+        onSuccess: (generated) => {
+          // Persist the proposal to DB, then navigate to its detail page
+          saveProposal.mutate(
+            {
+              data: {
+                collegeId: college.id,
+                collegeName: college.name,
+                collegeState: college.state,
+                courses: generated.prioritizedCourses,
+                contacts: contacts ?? [],
+                aiVirtues: [],
+                outreachLetter: generated.outreachLetter,
+                costAnalysis: generated.costAnalysis,
+              },
+            },
+            {
+              onSuccess: (saved) => {
+                setPitchCourse(null)
+                setLocation(`/proposals/${saved.id}`)
+              },
+            }
+          )
+        },
       }
     )
   }
