@@ -30,7 +30,7 @@ export default function CollegeDetail() {
   const id = params.id as string
   const [, setLocation] = useLocation()
 
-  const { data: college, isLoading: isLoadingCollege } = useGetCollege(id, {
+  const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
   })
   
@@ -83,8 +83,35 @@ export default function CollegeDetail() {
     return <div className="p-8"><Skeleton className="h-32 w-full" /></div>
   }
 
+  if (isCollegeError) {
+    // Distinguish a true 404 from a server/network error
+    const is404 = (collegeError as { status?: number } | null)?.status === 404
+    return (
+      <div className="p-8 text-center space-y-2">
+        <p className="text-lg font-semibold text-destructive">
+          {is404 ? "College not found" : "Failed to load college — please try again"}
+        </p>
+        {!is404 && (
+          <p className="text-sm text-muted-foreground">
+            There was a problem reaching the server. Check your connection or reload the page.
+          </p>
+        )}
+        <Link href="/colleges" className="text-sm text-primary underline">
+          ← Back to college search
+        </Link>
+      </div>
+    )
+  }
+
   if (!college) {
-    return <div className="p-8">College not found</div>
+    return (
+      <div className="p-8 text-center space-y-2">
+        <p className="text-lg font-semibold">College not found</p>
+        <Link href="/colleges" className="text-sm text-primary underline">
+          ← Back to college search
+        </Link>
+      </div>
+    )
   }
 
   const costComparisonData = costAnalysis ? [

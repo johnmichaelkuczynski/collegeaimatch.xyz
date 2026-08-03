@@ -166,9 +166,9 @@ router.get("/colleges/search", async (req, res): Promise<void> => {
   }
 });
 
-// ── GET /colleges/:id ───────────────────────────────────────────────────────
+// ── GET /colleges/:collegeId ─────────────────────────────────────────────────
 
-router.get("/colleges/:id", async (req, res): Promise<void> => {
+router.get("/colleges/:collegeId", async (req, res): Promise<void> => {
   const params = GetCollegeParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -207,9 +207,9 @@ router.get("/colleges/:id", async (req, res): Promise<void> => {
   }
 });
 
-// ── GET /colleges/:id/courses ───────────────────────────────────────────────
+// ── GET /colleges/:collegeId/courses ─────────────────────────────────────────
 
-router.get("/colleges/:id/courses", async (req, res): Promise<void> => {
+router.get("/colleges/:collegeId/courses", async (req, res): Promise<void> => {
   const pathParsed = GetCollegeCoursesParams.safeParse(req.params);
   if (!pathParsed.success) {
     res.status(400).json({ error: pathParsed.error.message });
@@ -247,9 +247,9 @@ router.get("/colleges/:id/courses", async (req, res): Promise<void> => {
   }
 });
 
-// ── GET /colleges/:id/contacts ──────────────────────────────────────────────
+// ── GET /colleges/:collegeId/contacts ────────────────────────────────────────
 
-router.get("/colleges/:id/contacts", async (req, res): Promise<void> => {
+router.get("/colleges/:collegeId/contacts", async (req, res): Promise<void> => {
   const params = GetCollegeContactsParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -308,9 +308,9 @@ router.get("/colleges/:id/contacts", async (req, res): Promise<void> => {
   }
 });
 
-// ── GET /colleges/:id/cost-analysis ────────────────────────────────────────
+// ── GET /colleges/:collegeId/cost-analysis ───────────────────────────────────
 
-router.get("/colleges/:id/cost-analysis", async (req, res): Promise<void> => {
+router.get("/colleges/:collegeId/cost-analysis", async (req, res): Promise<void> => {
   const pathParsed = GetCollegeCostAnalysisParams.safeParse(req.params);
   if (!pathParsed.success) {
     res.status(400).json({ error: pathParsed.error.message });
@@ -369,9 +369,9 @@ router.get("/colleges/:id/cost-analysis", async (req, res): Promise<void> => {
   }
 });
 
-// ── GET /colleges/:id/stats ─────────────────────────────────────────────────
+// ── GET /colleges/:collegeId/stats ───────────────────────────────────────────
 
-router.get("/colleges/:id/stats", async (req, res): Promise<void> => {
+router.get("/colleges/:collegeId/stats", async (req, res): Promise<void> => {
   const params = GetCollegeStatsParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -441,10 +441,10 @@ router.get("/colleges/:id/stats", async (req, res): Promise<void> => {
   }
 });
 
-// ── DELETE /colleges/:id/cache ──────────────────────────────────────────────
+// ── DELETE /colleges/:collegeId/cache ────────────────────────────────────────
 // Force-invalidate all cached AI data for a college (admin / manual refresh).
 
-router.delete("/colleges/:id/cache", async (req, res): Promise<void> => {
+router.delete("/colleges/:collegeId/cache", async (req, res): Promise<void> => {
   const params = GetCollegeParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

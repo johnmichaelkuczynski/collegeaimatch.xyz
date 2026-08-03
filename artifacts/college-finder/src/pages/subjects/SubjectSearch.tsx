@@ -35,6 +35,7 @@ export default function SubjectSearch() {
     query: {
       enabled: !!submittedSubject,
       staleTime: 1000 * 60 * 5, // 5 min cache
+      queryKey: getSearchBySubjectQueryKey({ subject: submittedSubject, institutionType: submittedType !== "all" ? submittedType : undefined, limit: 20 }),
     }
   })
 
