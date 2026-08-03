@@ -347,6 +347,8 @@ export async function generateOutreachLetter(params: {
   const primaryContact =
     contacts.find((c) => c.decisionPower === "provost") ?? contacts[0];
 
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
   const systemPrompt = `You are a senior business development writer for Zhi Systems, an AI courseware company.
 Write a compelling, specific outreach proposal letter for a college. The letter must:
 - Be addressed to the primary decision-maker by name and title
@@ -358,10 +360,14 @@ Write a compelling, specific outreach proposal letter for a college. The letter 
 - Sound authoritative, data-driven, and specific — NOT generic
 - Be formatted as a proper business letter (date, salutation, body paragraphs, closing)
 - Be approximately 600-900 words
+- The letter is from Douglas Fong at Zhi Systems. Use his name and contact details in the closing signature.
 
 Return the letter as plain text with standard letter formatting. No JSON wrapper.`;
 
-  const userPrompt = `College: ${college.name} (${college.city}, ${college.state})
+  const userPrompt = `Date: ${today}
+Sender: Douglas Fong, Zhi Systems | zhi@zhisystems.org | 845-240-4235
+
+College: ${college.name} (${college.city}, ${college.state})
 Type: ${college.type}
 Enrollment: ${college.enrollmentSize.toLocaleString()} students
 Dropout rate: ${college.dropoutRate?.toFixed(1) ?? "~35"}%
@@ -496,6 +502,7 @@ export async function generateSingleCoursePitch(
   const enrollment = course.estimatedEnrollment ?? 100;
   const isCommunity = college.type.toLowerCase().includes("community") ||
     college.type.toLowerCase().includes("junior");
+  const reportDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
   // One AI call — returns five tight paragraphs separated by blank lines
   const systemPrompt = `You are a senior analyst at Zhi Systems writing a tight, data-driven cost analysis report. Write exactly five short sections. Each section is 2-4 sentences maximum. Be specific to the institution and course. Do not include labels or headers — just the paragraph text. Separate sections with a single blank line. Use only the numbers you are given — do not invent or alter any figures. Tone: authoritative, direct, understated. No marketing language.`;
@@ -532,6 +539,7 @@ Write these five sections in order, blank line between each:
   const report = [
     "ZHI SYSTEMS\n",
     "Course Cost & Modernization Analysis\n",
+    `${reportDate}\n`,
     "\n\n",
     `${course.name}\n`,
     `${college.name}  ·  ${cityPart}${college.state}  ·  ~${college.enrollmentSize.toLocaleString()} students  ·  ~${enrollment.toLocaleString()} enrolled / yr  ·  ${failPct}% fail rate\n`,
@@ -568,7 +576,8 @@ Write these five sections in order, blank line between each:
     "Methodology\n\n",
     `Figures are conservative estimates built from published ${isCommunity ? "community-college" : "university"} section costs and this course's enrollment and fail rate. Every assumption is set to the low end: direct cost assumes ${isCommunity ? "adjunct-taught sections" : "standard faculty section rates"}; the dropout share counts only a quarter of failing students; lost revenue is valued at roughly one year of in-district tuition. Dollar figures are rounded down.\n`,
     "\n",
-    "Zhi Systems  —  zhi@zhisystems.org",
+    "Douglas Fong  ·  Zhi Systems\n",
+    "zhi@zhisystems.org  ·  845-240-4235",
   ].join("");
 
   return report;
