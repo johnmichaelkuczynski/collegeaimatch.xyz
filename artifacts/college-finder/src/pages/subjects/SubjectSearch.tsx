@@ -100,7 +100,7 @@ export default function SubjectSearch() {
           {!hasSearched && (
             <div className="mt-6 flex flex-wrap gap-2">
               <span className="text-sm text-muted-foreground py-1">Try:</span>
-              {["Remedial Math", "English Composition", "Intro to Psychology", "Anatomy & Physiology"].map(s => (
+              {["Remedial Math", "English Composition", "Intro to Psychology", "Anatomy & Physiology", "Databases / SQL", "Data Structures & Algorithms", "Intro to Programming"].map(s => (
                 <Badge 
                   key={s} 
                   variant="outline" 

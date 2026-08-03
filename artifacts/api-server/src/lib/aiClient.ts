@@ -142,7 +142,7 @@ Dropout rate: ${college.dropoutRate ? `${college.dropoutRate.toFixed(1)}%` : "un
 Tuition (in-state): ${college.tuitionInState ? `$${college.tuitionInState.toLocaleString()}` : "unknown"}
 ${subject ? `Focus on subject area: ${subject}` : "Generate the 12-15 most important AI-candidate courses for this institution type"}
 
-Include general education gateway courses (Remedial Math, Composition I, Intro to Psychology, Ethics, Critical Thinking) plus programs specific to this institution type.
+Include general education gateway courses (Remedial Math, Composition I, Intro to Psychology, Ethics, Critical Thinking) plus computer science / tech courses (Databases / SQL, Data Structures and Algorithms, Introduction to Programming / Computational Thinking) plus programs specific to this institution type.
 Use realistic section counts based on enrollment and typical class sizes (25–35 students/section).
 Apply the cost-per-section benchmarks for this institution type strictly.`;
 
