@@ -249,6 +249,40 @@ router.get("/proposals/:id", async (req, res): Promise<void> => {
   }
 });
 
+// PATCH /proposals/:id — update outreach letter text
+router.patch("/proposals/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const proposalId = parseInt(raw, 10);
+  if (isNaN(proposalId)) {
+    res.status(400).json({ error: "Invalid proposal id" });
+    return;
+  }
+
+  const { outreachLetter } = req.body as { outreachLetter?: string };
+  if (typeof outreachLetter !== "string" || !outreachLetter.trim()) {
+    res.status(400).json({ error: "'outreachLetter' is required" });
+    return;
+  }
+
+  try {
+    const [updated] = await db
+      .update(proposalsTable)
+      .set({ outreachLetter })
+      .where(eq(proposalsTable.id, proposalId))
+      .returning({ id: proposalsTable.id });
+
+    if (!updated) {
+      res.status(404).json({ error: "Proposal not found" });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Patch proposal failed");
+    res.status(500).json({ error: "Failed to update proposal" });
+  }
+});
+
 // POST /proposals/:id/email
 router.post("/proposals/:id/email", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

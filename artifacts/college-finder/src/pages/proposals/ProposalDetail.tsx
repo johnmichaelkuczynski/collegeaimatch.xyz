@@ -1,28 +1,32 @@
 import * as React from "react"
 import { useParams, Link } from "wouter"
-import { ArrowLeft, Download, Send, Copy, FileText, CheckCircle2, TrendingUp, AlertCircle, Building, Loader2, Mail, User, AtSign } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
+import {
+  ArrowLeft, Download, Send, Copy, FileText, CheckCircle2,
+  Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye
+} from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
 import { pdf } from "@react-pdf/renderer"
 
 import { useGetProposal, getGetProposalQueryKey } from "@workspace/api-client-react"
-import { formatCurrency, formatNumber, formatPercent, cn } from "@/lib/utils"
+import { useQueryClient } from "@tanstack/react-query"
+import { formatCurrency, cn } from "@/lib/utils"
 import { buttonVariants, Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { ProposalPDF } from "./ProposalPDF"
 
-// ── Email dialog ─────────────────────────────────────────────────────────────
+// ── constants ─────────────────────────────────────────────────────────────────
+const REP_EMAIL_KEY = "zhi_rep_email"
 
-interface Contact {
-  name?: string
-  title?: string
-  email?: string
-}
+// ── Email dialog ──────────────────────────────────────────────────────────────
+
+interface Contact { name?: string; title?: string; email?: string }
+type SendState = "idle" | "sending" | "success" | "error"
 
 interface EmailDialogProps {
   open: boolean
@@ -30,25 +34,30 @@ interface EmailDialogProps {
   proposalId: number
   collegeName: string
   contacts: Contact[]
+  /** When true the dialog is pre-filled with the rep's own address */
+  previewMode?: boolean
 }
 
-type SendState = "idle" | "sending" | "success" | "error"
+function EmailDialog({ open, onClose, proposalId, collegeName, contacts, previewMode }: EmailDialogProps) {
+  const savedRepEmail = () => localStorage.getItem(REP_EMAIL_KEY) ?? ""
 
-function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: EmailDialogProps) {
   const [to, setTo] = React.useState("")
   const [recipientName, setRecipientName] = React.useState("")
   const [sendState, setSendState] = React.useState<SendState>("idle")
   const [errorMsg, setErrorMsg] = React.useState("")
 
-  // Reset state each time dialog opens
   React.useEffect(() => {
-    if (open) {
+    if (!open) return
+    setSendState("idle")
+    setErrorMsg("")
+    if (previewMode) {
+      setTo(savedRepEmail())
+      setRecipientName("")
+    } else {
       setTo("")
       setRecipientName("")
-      setSendState("idle")
-      setErrorMsg("")
     }
-  }, [open])
+  }, [open, previewMode])
 
   function selectContact(c: Contact) {
     setTo(c.email ?? "")
@@ -56,17 +65,20 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: Email
   }
 
   async function handleSend() {
-    if (!to.trim() || !to.includes("@")) {
+    const dest = to.trim()
+    if (!dest || !dest.includes("@")) {
       setErrorMsg("Please enter a valid email address.")
       return
     }
+    // Persist rep email whenever they use preview mode
+    if (previewMode) localStorage.setItem(REP_EMAIL_KEY, dest)
     setSendState("sending")
     setErrorMsg("")
     try {
       const res = await fetch(`/api/proposals/${proposalId}/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: to.trim(), recipientName: recipientName.trim() || undefined }),
+        body: JSON.stringify({ to: dest, recipientName: recipientName.trim() || undefined }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -74,6 +86,7 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: Email
       }
       setSendState("success")
     } catch (err) {
+      setSendState("sending" === sendState ? "error" : "error")
       setSendState("error")
       setErrorMsg(err instanceof Error ? err.message : "Unknown error")
     }
@@ -87,31 +100,35 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: Email
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
-            Send Proposal
+            {previewMode ? "Send Preview to Yourself" : "Send to College Official"}
           </DialogTitle>
           <DialogDescription>
-            Email the {collegeName} proposal to a decision-maker.
+            {previewMode
+              ? "Review the proposal in your inbox before sending it to the college."
+              : `Email the ${collegeName} proposal to a decision-maker.`}
           </DialogDescription>
         </DialogHeader>
 
         {sendState === "success" ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-            <p className="font-semibold text-lg">Email sent!</p>
+            <p className="font-semibold text-lg">
+              {previewMode ? "Preview sent!" : "Email sent!"}
+            </p>
             <p className="text-sm text-muted-foreground">
-              Proposal delivered to <span className="font-mono">{to}</span>
+              Delivered to <span className="font-mono">{to}</span>
             </p>
             <Button className="mt-2" onClick={onClose}>Close</Button>
           </div>
         ) : (
           <div className="space-y-5 pt-1">
-            {/* Contact quick-select */}
-            {emailContacts.length > 0 && (
+            {/* Contact quick-select (not shown in preview mode) */}
+            {!previewMode && emailContacts.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">
                   Select a contact
                 </Label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {emailContacts.map((c, i) => (
                     <button
                       key={i}
@@ -128,44 +145,47 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: Email
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground text-center pt-1">— or enter manually —</p>
               </div>
             )}
 
-            {/* Manual input */}
+            {/* Address fields */}
             <div className="space-y-3">
-              {emailContacts.length > 0 && (
-                <p className="text-xs text-muted-foreground text-center">— or enter manually —</p>
-              )}
               <div className="space-y-1.5">
                 <Label htmlFor="email-to">
                   <AtSign className="inline h-3.5 w-3.5 mr-1" />
                   To
+                  {previewMode && (
+                    <span className="ml-2 text-xs text-muted-foreground font-normal">(your email — saved for next time)</span>
+                  )}
                 </Label>
                 <Input
                   id="email-to"
                   type="email"
-                  placeholder="provost@college.edu"
+                  placeholder={previewMode ? "your@email.com" : "provost@college.edu"}
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email-name">
-                  <User className="inline h-3.5 w-3.5 mr-1" />
-                  Recipient name <span className="text-muted-foreground font-normal">(optional)</span>
-                </Label>
-                <Input
-                  id="email-name"
-                  placeholder="Dr. Jane Smith"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                />
-              </div>
+              {!previewMode && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="email-name">
+                    <User className="inline h-3.5 w-3.5 mr-1" />
+                    Recipient name <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <Input
+                    id="email-name"
+                    placeholder="Dr. Jane Smith"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             {errorMsg && (
               <div className="flex items-center gap-2 rounded-md bg-destructive/10 text-destructive text-sm px-3 py-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+                <X className="h-4 w-4 shrink-0" />
                 {errorMsg}
               </div>
             )}
@@ -177,7 +197,9 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: Email
               <Button onClick={handleSend} disabled={sendState === "sending" || !to.trim()}>
                 {sendState === "sending"
                   ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</>
-                  : <><Send className="mr-2 h-4 w-4" />Send Email</>}
+                  : previewMode
+                    ? <><Eye className="mr-2 h-4 w-4" />Send Preview</>
+                    : <><Send className="mr-2 h-4 w-4" />Send Email</>}
               </Button>
             </DialogFooter>
           </div>
@@ -187,17 +209,56 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: Email
   )
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ProposalDetail() {
   const params = useParams()
   const id = Number(params.id)
+  const queryClient = useQueryClient()
+
   const [pdfLoading, setPdfLoading] = React.useState(false)
   const [emailOpen, setEmailOpen] = React.useState(false)
+  const [previewEmailOpen, setPreviewEmailOpen] = React.useState(false)
+
+  // Letter editing
+  const [editMode, setEditMode] = React.useState(false)
+  const [editedLetter, setEditedLetter] = React.useState("")
+  const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle")
 
   const { data: proposal, isLoading } = useGetProposal(id, {
     query: { enabled: !isNaN(id), queryKey: getGetProposalQueryKey(id) }
   })
+
+  function startEdit() {
+    setEditedLetter(proposal?.outreachLetter ?? "")
+    setEditMode(true)
+    setSaveState("idle")
+  }
+
+  function cancelEdit() {
+    setEditMode(false)
+    setSaveState("idle")
+  }
+
+  async function saveLetter() {
+    setSaveState("saving")
+    try {
+      const res = await fetch(`/api/proposals/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outreachLetter: editedLetter }),
+      })
+      if (!res.ok) throw new Error("Save failed")
+      // Optimistically update the cache
+      queryClient.setQueryData(getGetProposalQueryKey(id), (old: typeof proposal) =>
+        old ? { ...old, outreachLetter: editedLetter } : old
+      )
+      setSaveState("saved")
+      setEditMode(false)
+    } catch {
+      setSaveState("error")
+    }
+  }
 
   async function handleDownloadPdf() {
     if (!proposal) return
@@ -227,9 +288,7 @@ export default function ProposalDetail() {
     </div>
   }
 
-  if (!proposal) {
-    return <div className="p-8 text-center">Proposal not found</div>
-  }
+  if (!proposal) return <div className="p-8 text-center">Proposal not found</div>
 
   const { costAnalysis, courses, contacts } = proposal
 
@@ -241,8 +300,19 @@ export default function ProposalDetail() {
     { name: 'Annual Savings', value: costAnalysis.savingsAnnual, fill: 'hsl(var(--accent))' }
   ] : []
 
+  const letterText = proposal.outreachLetter ?? ""
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-12">
+      {/* Email dialogs */}
+      <EmailDialog
+        open={previewEmailOpen}
+        onClose={() => setPreviewEmailOpen(false)}
+        proposalId={id}
+        collegeName={proposal.collegeName}
+        contacts={(contacts ?? []) as Contact[]}
+        previewMode
+      />
       <EmailDialog
         open={emailOpen}
         onClose={() => setEmailOpen(false)}
@@ -251,7 +321,8 @@ export default function ProposalDetail() {
         contacts={(contacts ?? []) as Contact[]}
       />
 
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
           <Link href="/proposals" className={buttonVariants({ variant: "ghost", size: "icon" })}>
             <ArrowLeft className="h-4 w-4" />
@@ -263,58 +334,88 @@ export default function ProposalDetail() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline"><Copy className="mr-2 h-4 w-4" /> Copy Link</Button>
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={handleDownloadPdf} disabled={pdfLoading}>
             {pdfLoading
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
-              : <><Download className="mr-2 h-4 w-4" /> Download PDF</>}
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
+              : <><Download className="mr-2 h-4 w-4" />Download PDF</>}
+          </Button>
+          <Button variant="outline" onClick={() => setPreviewEmailOpen(true)}>
+            <Eye className="mr-2 h-4 w-4" />Preview (send to myself)
           </Button>
           <Button onClick={() => setEmailOpen(true)}>
-            <Send className="mr-2 h-4 w-4" /> Send Email
+            <Send className="mr-2 h-4 w-4" />Send to College
           </Button>
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Left Column: Letter & Pitch */}
+        {/* Left Column: Letter */}
         <div className="md:col-span-2 space-y-6">
           <Card className="border-t-4 border-t-primary shadow-md">
             <CardHeader className="bg-muted/20 border-b pb-4">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Executive Outreach Letter
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Outreach Letter
+                </span>
+                {!editMode ? (
+                  <Button variant="ghost" size="sm" onClick={startEdit}>
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />Edit
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                      <X className="mr-1.5 h-3.5 w-3.5" />Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveLetter} disabled={saveState === "saving"}>
+                      {saveState === "saving"
+                        ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving…</>
+                        : <><Save className="mr-1.5 h-3.5 w-3.5" />Save</>}
+                    </Button>
+                  </div>
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-8 prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-bold">
-              <div className="whitespace-pre-wrap font-serif text-[15px] text-slate-800 dark:text-slate-200">
-                {proposal.outreachLetter}
-              </div>
+            <CardContent className="p-6">
+              {saveState === "error" && (
+                <p className="text-sm text-destructive mb-3">Save failed — please try again.</p>
+              )}
+              {editMode ? (
+                <Textarea
+                  className="font-serif text-[14px] text-slate-800 dark:text-slate-200 leading-relaxed min-h-[600px] resize-y"
+                  value={editedLetter}
+                  onChange={(e) => setEditedLetter(e.target.value)}
+                  spellCheck
+                />
+              ) : (
+                <div className="whitespace-pre-wrap font-serif text-[15px] text-slate-800 dark:text-slate-200 leading-relaxed">
+                  {letterText}
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Value Props Emphasized</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {proposal.aiVirtues?.map(virtue => (
-                  <Badge key={virtue} variant="secondary" className="px-3 py-1 text-sm bg-primary/10 text-primary hover:bg-primary/20">
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    {virtue}
-                  </Badge>
-                ))}
-                {(!proposal.aiVirtues || proposal.aiVirtues.length === 0) && (
-                  <span className="text-muted-foreground text-sm">No specific virtues tagged.</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* AI Virtues */}
+          {proposal.aiVirtues && proposal.aiVirtues.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>AI Value Props Emphasized</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {proposal.aiVirtues.map(virtue => (
+                    <Badge key={virtue} variant="secondary" className="px-3 py-1 text-sm bg-primary/10 text-primary">
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />{virtue}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Right Column: Data & Contacts */}
+        {/* Right Column */}
         <div className="space-y-6">
+          {/* ROI */}
           <Card className="bg-slate-50 dark:bg-slate-900 border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">ROI Summary</CardTitle>
@@ -324,10 +425,10 @@ export default function ProposalDetail() {
                 <div>
                   <div className="text-sm text-muted-foreground uppercase font-semibold">Total Opportunity</div>
                   <div className="text-3xl font-black font-mono text-emerald-600">
-                    {formatCurrency(costAnalysis?.savingsAnnual || 0)} <span className="text-base font-sans font-normal text-muted-foreground">/ yr</span>
+                    {formatCurrency(costAnalysis?.savingsAnnual || 0)}
+                    <span className="text-base font-sans font-normal text-muted-foreground"> / yr</span>
                   </div>
                 </div>
-                
                 <div className="h-48 mt-4 -ml-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={waterfallData} layout="vertical" margin={{ top: 0, right: 20, left: 20, bottom: 0 }}>
@@ -346,11 +447,11 @@ export default function ProposalDetail() {
             </CardContent>
           </Card>
 
+          {/* Target Courses */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center justify-between">
-                Target Courses
-                <Badge>{courses?.length || 0}</Badge>
+                Target Courses <Badge>{courses?.length || 0}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 px-4 pb-4">
@@ -364,12 +465,13 @@ export default function ProposalDetail() {
               ))}
               {courses && courses.length > 5 && (
                 <div className="text-xs text-center text-muted-foreground pt-2">
-                  + {courses.length - 5} more courses included in analysis
+                  + {courses.length - 5} more courses in analysis
                 </div>
               )}
             </CardContent>
           </Card>
 
+          {/* Contacts */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Key Contacts</CardTitle>

@@ -390,7 +390,19 @@ Total cost with AI (year 1): $${costAnalysis.totalCostWithAI.toLocaleString()}
 
 Write a specific, data-driven outreach letter for this institution.`;
 
-  const letter = await openaiChat(systemPrompt, userPrompt, false);
+  const raw = await openaiChat(systemPrompt, userPrompt, false);
+
+  // Replace any placeholder tokens the AI emits despite being told not to
+  const letter = raw
+    .replace(/\[Date\]/gi, today)
+    .replace(/\[Your Name\]/gi, "Douglas Fong")
+    .replace(/\[Your Email(?: Address)?\]/gi, "zhi@zhisystems.org")
+    .replace(/\[Your Phone(?: Number)?\]/gi, "845-240-4235")
+    .replace(/\[Your Title\]/gi, "Senior Business Development Representative")
+    .replace(/\[Name\]/gi, "Douglas Fong")
+    .replace(/\[Email\]/gi, "zhi@zhisystems.org")
+    .replace(/\[Phone\]/gi, "845-240-4235");
+
   return letter;
 }
 
