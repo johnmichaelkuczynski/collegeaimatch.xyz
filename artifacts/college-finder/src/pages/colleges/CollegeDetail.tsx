@@ -3,7 +3,7 @@ import { useParams, Link, useLocation } from "wouter"
 import { 
   Building, GraduationCap, MapPin, ExternalLink, AlertTriangle, 
   UserCircle, Mail, Phone, Linkedin, TrendingUp, TrendingDown,
-  ArrowRight, FileText, X
+  ArrowRight, FileText, X, Loader2, Pencil
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts"
 
@@ -26,8 +26,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -36,6 +39,11 @@ export default function CollegeDetail() {
   const id = params.id as string
   const [, setLocation] = useLocation()
   const [pitchCourse, setPitchCourse] = React.useState<Course | null>(null)
+  const [tone, setTone] = React.useState('formal')
+  const [baseTone, setBaseTone] = React.useState('formal')
+  const [scratchOpen, setScratchOpen] = React.useState(false)
+  const [scratchLetter, setScratchLetter] = React.useState('')
+  const [scratchSaving, setScratchSaving] = React.useState(false)
 
   const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
@@ -60,8 +68,9 @@ export default function CollegeDetail() {
   const generateProposal = useGenerateProposal()
   const saveProposal = useCreateProposal()
 
-  const handleGenerateProposal = (singleCourse?: Course) => {
+  const handleGenerateProposal = (singleCourse?: Course, toneOverride?: string, editAfter?: boolean) => {
     if (!college) return
+    const activeTone = toneOverride ?? (tone !== 'manual' ? tone : 'formal')
     const generateData = {
       collegeId: college.id,
       collegeName: college.name,
@@ -74,6 +83,7 @@ export default function CollegeDetail() {
       courses: singleCourse ? [singleCourse] : courses,
       contacts: contacts,
       costAnalysis: costAnalysis,
+      tone: activeTone,
       ...(singleCourse ? { pitchMode: true } : {}),
     }
     generateProposal.mutate(
@@ -81,7 +91,6 @@ export default function CollegeDetail() {
       { data: generateData as any },
       {
         onSuccess: (generated) => {
-          // Persist the proposal to DB, then navigate to its detail page
           saveProposal.mutate(
             {
               data: {
@@ -98,11 +107,38 @@ export default function CollegeDetail() {
             {
               onSuccess: (saved) => {
                 setPitchCourse(null)
-                setLocation(`/proposals/${saved.id}`)
+                setLocation(editAfter ? `/proposals/${saved.id}?edit=true` : `/proposals/${saved.id}`)
               },
             }
           )
         },
+      }
+    )
+  }
+
+  const handleSaveScratch = () => {
+    if (!college || !scratchLetter.trim()) return
+    setScratchSaving(true)
+    saveProposal.mutate(
+      {
+        data: {
+          collegeId: college.id,
+          collegeName: college.name,
+          collegeState: college.state,
+          courses: courses ?? [],
+          contacts: contacts ?? [],
+          aiVirtues: [],
+          outreachLetter: scratchLetter,
+          costAnalysis: costAnalysis,
+        },
+      },
+      {
+        onSuccess: (saved) => {
+          setScratchOpen(false)
+          setScratchSaving(false)
+          setLocation(`/proposals/${saved.id}`)
+        },
+        onError: () => setScratchSaving(false),
       }
     )
   }
@@ -483,21 +519,201 @@ export default function CollegeDetail() {
         </TabsContent>
       </Tabs>
 
-      {/* CTA FOOTER — full multi-course proposal */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/80 backdrop-blur-md border-t flex items-center justify-between z-10 shadow-lg">
-        <p className="text-xs text-muted-foreground hidden md:block">
-          Full proposal targets all {courses?.length || 0} courses · use <strong>Pitch</strong> on a row for a single-course pitch
-        </p>
-        <Button 
-          size="lg" 
-          className="font-bold px-8 shadow-md"
-          onClick={() => handleGenerateProposal()}
-          disabled={generateProposal.isPending || !costAnalysis || !courses}
-        >
-          {generateProposal.isPending ? "Generating..." : "Generate Full Proposal"}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+      {/* CTA FOOTER — tone selector + proposal generation */}
+      <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-background/95 backdrop-blur-md border-t z-10 shadow-lg">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
+          {/* Tone selector */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap hidden sm:block">Tone:</span>
+            <Select value={tone} onValueChange={setTone}>
+              <SelectTrigger className="h-8 w-52 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="formal">Formal / Institutional</SelectItem>
+                <SelectItem value="direct">Direct / Quantitative</SelectItem>
+                <SelectItem value="provocative">Provocative / Blunt</SelectItem>
+                <SelectItem value="consultative">Consultative / Strategic</SelectItem>
+                <SelectItem value="urgency">Urgency / Competitive</SelectItem>
+                <SelectSeparator />
+                <SelectItem value="manual">✏️ Manual / Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            {tone === 'manual' ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setScratchLetter(''); setScratchOpen(true) }}
+                  disabled={!courses}
+                >
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Write from Scratch
+                </Button>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground hidden md:block">Base:</span>
+                  <Select value={baseTone} onValueChange={setBaseTone}>
+                    <SelectTrigger className="h-8 w-32 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="formal">Formal</SelectItem>
+                      <SelectItem value="direct">Direct</SelectItem>
+                      <SelectItem value="provocative">Provocative</SelectItem>
+                      <SelectItem value="consultative">Consultative</SelectItem>
+                      <SelectItem value="urgency">Urgency</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    onClick={() => handleGenerateProposal(undefined, baseTone, true)}
+                    disabled={generateProposal.isPending || !costAnalysis || !courses}
+                  >
+                    {generateProposal.isPending
+                      ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Generating…</>
+                      : <>Generate & Edit <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></>}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground hidden lg:block">
+                  {courses?.length || 0} courses · use <strong>Pitch</strong> for single-course
+                </p>
+                <Button
+                  size="lg"
+                  className="font-bold shadow-md"
+                  onClick={() => handleGenerateProposal()}
+                  disabled={generateProposal.isPending || !costAnalysis || !courses}
+                >
+                  {generateProposal.isPending
+                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
+                    : <>Generate Proposal <ArrowRight className="ml-2 h-4 w-4" /></>}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* WRITE FROM SCRATCH DIALOG */}
+      <Dialog open={scratchOpen} onOpenChange={(v) => !v && setScratchOpen(false)}>
+        <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-primary" />
+              Write Custom Outreach — {college.name}
+            </DialogTitle>
+            <DialogDescription>
+              Write your letter below. College data is in the sidebar for reference.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            {/* Editor */}
+            <div className="flex-1 flex flex-col p-4 min-w-0">
+              <Textarea
+                className="flex-1 resize-none font-serif text-[14px] leading-relaxed text-slate-800 dark:text-slate-200 min-h-0"
+                placeholder={`${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+
+${contacts?.[0]?.name ?? "Dear Decision-Maker"},
+${contacts?.[0]?.title ? contacts[0].title + "\n" : ""}${college.name}
+
+Dear ${contacts?.[0]?.name ? contacts[0].name.split(' ').slice(-1)[0] : "Colleague"},
+
+[Write your letter here...]
+
+Warm regards,
+Douglas Fong
+Zhi Systems
+zhi@zhisystems.org
+845-240-4235`}
+                value={scratchLetter}
+                onChange={(e) => setScratchLetter(e.target.value)}
+                spellCheck
+              />
+            </div>
+
+            {/* Stats sidebar */}
+            <div className="w-72 shrink-0 border-l bg-muted/30 overflow-y-auto p-4 space-y-4">
+              {/* College snapshot */}
+              <div>
+                <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">Institution</Label>
+                <div className="mt-1.5 space-y-1 text-sm">
+                  <div className="font-medium">{college.name}</div>
+                  <div className="text-muted-foreground">{college.city ? `${college.city}, ` : ''}{college.state} · {college.type?.replace('_', ' ')}</div>
+                  <div>{college.enrollmentSize?.toLocaleString()} enrolled</div>
+                  {college.dropoutRate && (
+                    <div className="text-destructive font-medium">{college.dropoutRate.toFixed(1)}% dropout rate</div>
+                  )}
+                </div>
+              </div>
+
+              {/* ROI */}
+              {costAnalysis && (
+                <div>
+                  <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">ROI</Label>
+                  <div className="mt-1.5 space-y-1 text-sm">
+                    <div>Current cost: <span className="font-mono">{formatCurrency(costAnalysis.totalCurrentAnnualCost)}</span></div>
+                    <div>True cost: <span className="font-mono font-medium text-destructive">{formatCurrency(costAnalysis.totalCostWithoutAI)}</span></div>
+                    <div>Annual savings: <span className="font-mono font-bold text-emerald-600">{formatCurrency(costAnalysis.savingsAnnual)}</span></div>
+                    <div>Zhi annual: <span className="font-mono">{formatCurrency(costAnalysis.totalAiAnnualCost)}</span></div>
+                    <div>Zhi setup: <span className="font-mono">{formatCurrency(costAnalysis.totalAiInstallCost)}</span></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Key contacts */}
+              {contacts && contacts.length > 0 && (
+                <div>
+                  <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">Key Contacts</Label>
+                  <div className="mt-1.5 space-y-2">
+                    {contacts.slice(0, 4).map((c, i) => (
+                      <div key={i} className="text-xs border rounded p-2 bg-background">
+                        <div className="font-medium">{c.name}</div>
+                        <div className="text-muted-foreground">{c.title}</div>
+                        {c.email && <div className="font-mono text-primary">{c.email}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top courses */}
+              {courses && courses.length > 0 && (
+                <div>
+                  <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">Top Courses</Label>
+                  <div className="mt-1.5 space-y-1">
+                    {courses.slice(0, 8).map((c, i) => (
+                      <div key={i} className="text-xs flex justify-between gap-2">
+                        <span className="truncate">{c.name}</span>
+                        <span className="font-mono text-muted-foreground shrink-0">
+                          {c.failRate ? `${c.failRate}% fail` : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
+            <Button variant="outline" onClick={() => setScratchOpen(false)} disabled={scratchSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveScratch} disabled={scratchSaving || !scratchLetter.trim()}>
+              {scratchSaving
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+                : <>Save Proposal <ArrowRight className="ml-2 h-4 w-4" /></>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* SINGLE-COURSE PITCH DIALOG */}
       <Dialog open={!!pitchCourse} onOpenChange={(open) => { if (!open) setPitchCourse(null) }}>

@@ -324,14 +324,65 @@ export async function generateCostAnalysis(
   };
 }
 
+export type OutreachTone = "formal" | "direct" | "provocative" | "consultative" | "urgency";
+
+const TONE_SYSTEM_PROMPTS: Record<OutreachTone, string> = {
+  formal: `You are a senior business development writer for Zhi Systems, an AI courseware company.
+Write a compelling, specific outreach proposal letter for a college. The letter must:
+- Be addressed to the primary decision-maker by name and title
+- Reference specific institutional data (enrollment, dropout rates, tuition, specific courses)
+- Explain exactly which courses Zhi Systems recommends replacing with AI versions and why
+- Include specific cost figures (current delivery cost vs AI costs) with precise dollar amounts
+- Reference the AI virtues/features that matter most to this institution
+- Close with concrete next steps
+- Sound authoritative, data-driven, and specific — NOT generic
+- Be formatted as a proper business letter (date, salutation, body paragraphs, closing)
+- Be approximately 600-900 words
+- The letter is from Douglas Fong at Zhi Systems. Use his name and contact details in the closing signature.
+Return the letter as plain text with standard letter formatting. No JSON wrapper.`,
+
+  direct: `You are a no-nonsense business development rep for Zhi Systems AI courseware.
+Write a direct, numbers-first outreach letter. OPEN IMMEDIATELY with the financial headline — zero pleasantries.
+Format the opening as: "[Title] [Last Name]: [College] is losing $[X] annually to course failures across [N] gateway courses. We can cut that number in half. Here's the math."
+Then: data → cost table → specific course recommendations → crisp call to action.
+NO "I hope this letter finds you well." NO warm-up. Lead with the problem and the dollar amount.
+Approximately 400-600 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235.
+Return plain text. No JSON wrapper.`,
+
+  provocative: `You are a bold, results-focused rep for Zhi Systems writing a deliberately provocative outreach letter.
+Open by naming the failure directly and unapologetically. Example: "Your [course] program has a [X]% fail rate and costs $[amount]/year to deliver [N] students poor outcomes. We'll do it for $[amount] with better results. Want to see the proof, or just sign the contract?"
+Be audacious but not unprofessional — back every claim with the real numbers from the data provided.
+Challenge the status quo, contrast current costs against Zhi pricing starkly, and make inaction feel costly.
+Approximately 400-600 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235.
+Return plain text. No JSON wrapper.`,
+
+  consultative: `You are a strategic higher-education consultant writing on behalf of Zhi Systems.
+Write a consultative, peer-to-peer letter — not a sales pitch. Position this as a shared industry challenge.
+Reference sector-wide trends: AI adoption in community colleges, the national DFW (drop/fail/withdraw) crisis, budget pressures on instructional staff.
+Frame Zhi Systems as a collaborative partner addressing systemic pressures, not a vendor pushing product.
+Cite comparable institutions (without naming them) that have piloted AI-enhanced courses with measurable outcome improvements.
+Acknowledge faculty governance concerns; position Zhi as supplemental to, not replacement for, faculty authority.
+Approximately 700-900 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235.
+Return plain text. No JSON wrapper.`,
+
+  urgency: `You are a business development rep for Zhi Systems writing an urgency-driven outreach letter.
+Create real momentum: reference limited pilot capacity, other institutions already in the program, and the competitive disadvantage of waiting.
+Imply a finite window — pilot cohort enrollment closes, peer institutions are gaining first-mover advantage in AI courseware adoption.
+Be specific about timelines or cohort limits. Don't be gimmicky — make the urgency feel grounded in real market dynamics.
+Use institution-specific data to show that waiting another year means another year of the same dropout losses.
+Approximately 500-700 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235.
+Return plain text. No JSON wrapper.`,
+};
+
 export async function generateOutreachLetter(params: {
   college: CollegeInfo;
   courses: CourseData[];
   contacts: ContactData[];
   aiVirtues: string[];
   costAnalysis: CostAnalysisData;
+  tone?: OutreachTone;
 }): Promise<string> {
-  const { college, courses, contacts, aiVirtues, costAnalysis } = params;
+  const { college, courses, contacts, aiVirtues, costAnalysis, tone = "formal" } = params;
 
   const priorityCourses = courses
     .filter((c) => c.isHighPriority)
@@ -349,20 +400,7 @@ export async function generateOutreachLetter(params: {
 
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
-  const systemPrompt = `You are a senior business development writer for Zhi Systems, an AI courseware company.
-Write a compelling, specific outreach proposal letter for a college. The letter must:
-- Be addressed to the primary decision-maker by name and title
-- Reference specific institutional data (enrollment, dropout rates, tuition, specific courses)
-- Explain exactly which courses Zhi Systems recommends replacing with AI versions and why
-- Include specific cost figures (current delivery cost vs AI costs) with precise dollar amounts
-- Reference the AI virtues/features that matter most to this institution
-- Close with concrete next steps
-- Sound authoritative, data-driven, and specific — NOT generic
-- Be formatted as a proper business letter (date, salutation, body paragraphs, closing)
-- Be approximately 600-900 words
-- The letter is from Douglas Fong at Zhi Systems. Use his name and contact details in the closing signature.
-
-Return the letter as plain text with standard letter formatting. No JSON wrapper.`;
+  const systemPrompt = TONE_SYSTEM_PROMPTS[tone] ?? TONE_SYSTEM_PROMPTS.formal;
 
   const userPrompt = `Date: ${today}
 Sender: Douglas Fong, Zhi Systems | zhi@zhisystems.org | 845-240-4235

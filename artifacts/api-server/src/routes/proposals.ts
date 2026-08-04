@@ -66,6 +66,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
   const rawBody = req.body as Record<string, unknown>;
   const pitchMode = rawBody.pitchMode === true;
   const collegeCity = typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";
+  const tone = typeof rawBody.tone === "string" ? rawBody.tone as import("../lib/aiClient").OutreachTone : "formal";
 
   try {
     const collegeInfo: CollegeInfo = {
@@ -146,6 +147,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
       })),
       aiVirtues: input.aiVirtues ?? [],
       costAnalysis,
+      tone,
     });
 
     const prioritizedCourses = [...courses].sort(

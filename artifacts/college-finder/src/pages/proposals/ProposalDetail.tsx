@@ -224,10 +224,21 @@ export default function ProposalDetail() {
   const [editMode, setEditMode] = React.useState(false)
   const [editedLetter, setEditedLetter] = React.useState("")
   const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle")
+  // Auto-open edit mode when navigated here with ?edit=true
+  const autoEditFired = React.useRef(false)
 
   const { data: proposal, isLoading } = useGetProposal(id, {
     query: { enabled: !isNaN(id), queryKey: getGetProposalQueryKey(id) }
   })
+
+  // Auto-open edit mode when navigated here with ?edit=true
+  React.useEffect(() => {
+    if (proposal && window.location.search.includes('edit=true') && !autoEditFired.current) {
+      autoEditFired.current = true
+      setEditedLetter(proposal.outreachLetter ?? "")
+      setEditMode(true)
+    }
+  }, [proposal])
 
   function startEdit() {
     setEditedLetter(proposal?.outreachLetter ?? "")
