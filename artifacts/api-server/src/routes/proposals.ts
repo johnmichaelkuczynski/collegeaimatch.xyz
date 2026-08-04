@@ -18,6 +18,7 @@ import {
   type CourseData,
 } from "../lib/aiClient";
 import { webSearch } from "../lib/serpapi";
+import { sendProposalEmail } from "../lib/sendgrid";
 
 const router: IRouter = Router();
 
@@ -245,6 +246,52 @@ router.get("/proposals/:id", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Get proposal failed");
     res.status(500).json({ error: "Failed to get proposal" });
+  }
+});
+
+// POST /proposals/:id/email
+router.post("/proposals/:id/email", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const proposalId = parseInt(raw, 10);
+  if (isNaN(proposalId)) {
+    res.status(400).json({ error: "Invalid proposal id" });
+    return;
+  }
+
+  const { to, recipientName } = req.body as { to?: string; recipientName?: string };
+  if (!to || !to.includes("@")) {
+    res.status(400).json({ error: "A valid 'to' email address is required" });
+    return;
+  }
+
+  try {
+    const [proposal] = await db
+      .select()
+      .from(proposalsTable)
+      .where(eq(proposalsTable.id, proposalId));
+
+    if (!proposal) {
+      res.status(404).json({ error: "Proposal not found" });
+      return;
+    }
+
+    if (!proposal.outreachLetter) {
+      res.status(400).json({ error: "This proposal has no letter to send" });
+      return;
+    }
+
+    await sendProposalEmail({
+      to,
+      recipientName,
+      collegeName: proposal.collegeName,
+      outreachLetter: proposal.outreachLetter,
+      proposalId,
+    });
+
+    res.json({ success: true, to });
+  } catch (err) {
+    req.log.error({ err }, "Send proposal email failed");
+    res.status(500).json({ error: "Failed to send email" });
   }
 });
 

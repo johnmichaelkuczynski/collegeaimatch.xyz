@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useParams, Link } from "wouter"
-import { ArrowLeft, Download, Send, Copy, FileText, CheckCircle2, TrendingUp, AlertCircle, Building, Loader2 } from "lucide-react"
+import { ArrowLeft, Download, Send, Copy, FileText, CheckCircle2, TrendingUp, AlertCircle, Building, Loader2, Mail, User, AtSign } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
 import { pdf } from "@react-pdf/renderer"
 
@@ -11,12 +11,189 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ProposalPDF } from "./ProposalPDF"
+
+// ── Email dialog ─────────────────────────────────────────────────────────────
+
+interface Contact {
+  name?: string
+  title?: string
+  email?: string
+}
+
+interface EmailDialogProps {
+  open: boolean
+  onClose: () => void
+  proposalId: number
+  collegeName: string
+  contacts: Contact[]
+}
+
+type SendState = "idle" | "sending" | "success" | "error"
+
+function EmailDialog({ open, onClose, proposalId, collegeName, contacts }: EmailDialogProps) {
+  const [to, setTo] = React.useState("")
+  const [recipientName, setRecipientName] = React.useState("")
+  const [sendState, setSendState] = React.useState<SendState>("idle")
+  const [errorMsg, setErrorMsg] = React.useState("")
+
+  // Reset state each time dialog opens
+  React.useEffect(() => {
+    if (open) {
+      setTo("")
+      setRecipientName("")
+      setSendState("idle")
+      setErrorMsg("")
+    }
+  }, [open])
+
+  function selectContact(c: Contact) {
+    setTo(c.email ?? "")
+    setRecipientName(c.name ?? "")
+  }
+
+  async function handleSend() {
+    if (!to.trim() || !to.includes("@")) {
+      setErrorMsg("Please enter a valid email address.")
+      return
+    }
+    setSendState("sending")
+    setErrorMsg("")
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: to.trim(), recipientName: recipientName.trim() || undefined }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error((body as { error?: string }).error ?? "Send failed")
+      }
+      setSendState("success")
+    } catch (err) {
+      setSendState("error")
+      setErrorMsg(err instanceof Error ? err.message : "Unknown error")
+    }
+  }
+
+  const emailContacts = contacts.filter((c) => c.email)
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-primary" />
+            Send Proposal
+          </DialogTitle>
+          <DialogDescription>
+            Email the {collegeName} proposal to a decision-maker.
+          </DialogDescription>
+        </DialogHeader>
+
+        {sendState === "success" ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+            <p className="font-semibold text-lg">Email sent!</p>
+            <p className="text-sm text-muted-foreground">
+              Proposal delivered to <span className="font-mono">{to}</span>
+            </p>
+            <Button className="mt-2" onClick={onClose}>Close</Button>
+          </div>
+        ) : (
+          <div className="space-y-5 pt-1">
+            {/* Contact quick-select */}
+            {emailContacts.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">
+                  Select a contact
+                </Label>
+                <div className="space-y-2">
+                  {emailContacts.map((c, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => selectContact(c)}
+                      className={cn(
+                        "w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors hover:border-primary/60 hover:bg-primary/5",
+                        to === c.email ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"
+                      )}
+                    >
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">{c.title}</div>
+                      <div className="text-xs font-mono text-primary mt-0.5">{c.email}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Manual input */}
+            <div className="space-y-3">
+              {emailContacts.length > 0 && (
+                <p className="text-xs text-muted-foreground text-center">— or enter manually —</p>
+              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="email-to">
+                  <AtSign className="inline h-3.5 w-3.5 mr-1" />
+                  To
+                </Label>
+                <Input
+                  id="email-to"
+                  type="email"
+                  placeholder="provost@college.edu"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="email-name">
+                  <User className="inline h-3.5 w-3.5 mr-1" />
+                  Recipient name <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <Input
+                  id="email-name"
+                  placeholder="Dr. Jane Smith"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="flex items-center gap-2 rounded-md bg-destructive/10 text-destructive text-sm px-3 py-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {errorMsg}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose} disabled={sendState === "sending"}>
+                Cancel
+              </Button>
+              <Button onClick={handleSend} disabled={sendState === "sending" || !to.trim()}>
+                {sendState === "sending"
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</>
+                  : <><Send className="mr-2 h-4 w-4" />Send Email</>}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ProposalDetail() {
   const params = useParams()
   const id = Number(params.id)
   const [pdfLoading, setPdfLoading] = React.useState(false)
+  const [emailOpen, setEmailOpen] = React.useState(false)
 
   const { data: proposal, isLoading } = useGetProposal(id, {
     query: { enabled: !isNaN(id), queryKey: getGetProposalQueryKey(id) }
@@ -66,6 +243,14 @@ export default function ProposalDetail() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-12">
+      <EmailDialog
+        open={emailOpen}
+        onClose={() => setEmailOpen(false)}
+        proposalId={id}
+        collegeName={proposal.collegeName}
+        contacts={(contacts ?? []) as Contact[]}
+      />
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/proposals" className={buttonVariants({ variant: "ghost", size: "icon" })}>
@@ -85,7 +270,9 @@ export default function ProposalDetail() {
               ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
               : <><Download className="mr-2 h-4 w-4" /> Download PDF</>}
           </Button>
-          <Button><Send className="mr-2 h-4 w-4" /> Send Email</Button>
+          <Button onClick={() => setEmailOpen(true)}>
+            <Send className="mr-2 h-4 w-4" /> Send Email
+          </Button>
         </div>
       </div>
 
@@ -100,7 +287,6 @@ export default function ProposalDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-8 prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-bold">
-              {/* Render the outreach letter. In a real app this might be markdown or formatted text. */}
               <div className="whitespace-pre-wrap font-serif text-[15px] text-slate-800 dark:text-slate-200">
                 {proposal.outreachLetter}
               </div>
@@ -188,15 +374,24 @@ export default function ProposalDetail() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Key Contacts</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 px-4 pb-4">
-              {contacts?.slice(0, 4).map((contact, i) => (
+            <CardContent className="space-y-3 px-4 pb-4">
+              {(contacts as Contact[])?.slice(0, 4).map((contact, i) => (
                 <div key={i} className="flex flex-col space-y-1 bg-background border rounded-md p-3">
                   <div className="font-semibold text-sm">{contact.name}</div>
                   <div className="text-xs text-primary">{contact.title}</div>
-                  <div className="text-xs text-muted-foreground">{contact.email || "No email available"}</div>
+                  <div className="text-xs text-muted-foreground font-mono">{contact.email || "No email available"}</div>
+                  {contact.email && (
+                    <button
+                      type="button"
+                      onClick={() => setEmailOpen(true)}
+                      className="text-xs text-primary underline-offset-2 hover:underline text-left mt-0.5"
+                    >
+                      Email this contact →
+                    </button>
+                  )}
                 </div>
               ))}
-              {(!contacts || contacts.length === 0) && (
+              {(!contacts || (contacts as Contact[]).length === 0) && (
                 <div className="text-sm text-muted-foreground text-center py-4">No contact data appended.</div>
               )}
             </CardContent>
