@@ -83,16 +83,53 @@ const s = StyleSheet.create({
   contactTitle: { fontSize: 9, color: brand.primary, marginBottom: 2 },
   contactEmail: { fontSize: 8, color: brand.muted },
 
-  // Virtues
+  // Virtues (legacy pills — kept for backward compat)
   virtueRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   virtue: { backgroundColor: brand.primaryLight, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 },
   virtueText: { fontSize: 8, color: brand.primary, fontFamily: "Helvetica-Bold" },
+
+  // Feature highlight cards
+  featureGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18 },
+  featureCard: { width: "48%", borderWidth: 1, borderColor: brand.border, borderRadius: 5, padding: 10, backgroundColor: brand.white },
+  featureCardAccent: { width: 20, height: 3, backgroundColor: brand.primary, borderRadius: 2, marginBottom: 6 },
+  featureTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: brand.charcoal, marginBottom: 3 },
+  featureBody: { fontSize: 8, color: brand.textSecondary, lineHeight: 1.5 },
+  featureSectionBanner: { backgroundColor: brand.charcoal, padding: "10 14", borderRadius: 5, marginBottom: 10 },
+  featureSectionBannerText: { color: brand.white, fontSize: 10, fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
 
   // Footer
   footer: { position: "absolute", bottom: 24, left: 48, right: 48, flexDirection: "row", justifyContent: "space-between" },
   footerText: { fontSize: 8, color: brand.muted },
   pageNum: { fontSize: 8, color: brand.muted },
 })
+
+// ── Zhi Systems product virtues (kept in sync with sendgrid.ts) ───────────────
+const ZHI_VIRTUES = [
+  {
+    title: "24/7 Built-In Tutors",
+    body: "Every student has on-demand, personalized instruction — eliminating the access gap that stalls most online learning.",
+  },
+  {
+    title: "Cheat-Proof by Design",
+    body: "Assessments cannot be gamed, so course completion actually certifies competence employers can rely on.",
+  },
+  {
+    title: "Industry-Aligned Progress",
+    body: "Advancement is benchmarked to professional standards, making the credential something hiring managers trust.",
+  },
+  {
+    title: "Fixed Assessments, Adaptive Lectures",
+    body: "Tests and homework stay locked for rigor, while lectures flex in length, depth, and style to fit each learner.",
+  },
+  {
+    title: "Verified Mastery",
+    body: "Adaptation never dilutes standards — retention and mastery are confirmed, not assumed.",
+  },
+  {
+    title: "5-Year Free Maintenance Guarantee",
+    body: "The one-time setup fee locks in five full years of platform maintenance at no additional cost — zero budget surprises.",
+  },
+]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function usd(val: number | undefined | null): string {
@@ -231,19 +268,21 @@ export function ProposalPDF({ proposal }: { proposal: ProposalData }) {
           <Text style={s.letterText}>{proposal.outreachLetter ?? "No letter generated."}</Text>
         </View>
 
-        {/* AI Virtues */}
-        {proposal.aiVirtues && proposal.aiVirtues.length > 0 && (
-          <View style={{ marginBottom: 18 }}>
-            <Text style={s.sectionHeading}>AI Value Propositions</Text>
-            <View style={s.virtueRow}>
-              {proposal.aiVirtues.map((v, i) => (
-                <View key={i} style={s.virtue}>
-                  <Text style={s.virtueText}>✓ {v}</Text>
-                </View>
-              ))}
-            </View>
+        {/* Why Zhi Systems — Feature Highlights */}
+        <View style={{ marginBottom: 18 }}>
+          <View style={s.featureSectionBanner}>
+            <Text style={s.featureSectionBannerText}>WHY ZHI SYSTEMS — WHAT MAKES THIS DIFFERENT</Text>
           </View>
-        )}
+          <View style={s.featureGrid}>
+            {ZHI_VIRTUES.map((v, i) => (
+              <View key={i} style={s.featureCard}>
+                <View style={s.featureCardAccent} />
+                <Text style={s.featureTitle}>{v.title}</Text>
+                <Text style={s.featureBody}>{v.body}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
         {/* Footer */}
         <View style={s.footer} fixed>
