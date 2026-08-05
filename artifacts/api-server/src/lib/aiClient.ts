@@ -332,12 +332,7 @@ const TWO_MODEL_INSTRUCTIONS = `
 CRITICAL — TWO DEPLOYMENT OPTIONS:
 Zhi Systems courses can be deployed in two distinct ways, and BOTH must be presented clearly in every letter:
 
-OPTION A — FULL REPLACEMENT: The Zhi AI course entirely replaces the human-taught section.
-  • The college eliminates its instructor cost for that course.
-  • Students experience AI-powered, 24/7 instruction with verified mastery checkpoints.
-  • This option maximizes savings but may raise faculty governance concerns — acknowledge this honestly.
-
-OPTION B — SUPPLEMENTAL / PREREQUISITE (the lower-risk entry point): The Zhi AI course is offered
+OPTION A — SUPPLEMENTAL / PREREQUISITE (the lower-risk entry point): The Zhi AI course is offered
   as a prep course that students take BEFORE enrolling in the college's existing human-taught section.
   • The college's instructors remain in place — no displacement concerns.
   • Students who complete the Zhi prep course arrive better prepared, which raises pass rates and
@@ -346,10 +341,15 @@ OPTION B — SUPPLEMENTAL / PREREQUISITE (the lower-risk entry point): The Zhi A
   • This option costs less to implement, is far easier to get past faculty governance, and still
     delivers measurable ROI through improved outcomes and reduced retake/dropout costs.
 
+OPTION B — FULL REPLACEMENT: The Zhi AI course entirely replaces the human-taught section.
+  • The college eliminates its instructor cost for that course.
+  • Students experience AI-powered, 24/7 instruction with verified mastery checkpoints.
+  • This option maximizes savings but may raise faculty governance concerns — acknowledge this honestly.
+
 Structure the letter so that:
-1. You lead with OPTION B (supplemental) as the non-threatening, easy-win entry point.
+1. You lead with OPTION A (supplemental) as the non-threatening, easy-win entry point.
    Cite the specific pass-rate, retention, and follow-up-class improvements from the data provided.
-2. You present OPTION A (full replacement) as an optional next step for institutions ready for deeper
+2. You present OPTION B (full replacement) as an optional next step for institutions ready for deeper
    transformation — something they can grow into, not something being forced on them.
 3. The framing is: "Start where you're comfortable. The data is compelling either way."
 
