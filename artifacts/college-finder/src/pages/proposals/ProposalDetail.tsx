@@ -269,7 +269,15 @@ export default function ProposalDetail() {
   const autoEditFired = React.useRef(false)
 
   const { data: proposal, isLoading } = useGetProposal(id, {
-    query: { enabled: !isNaN(id), queryKey: getGetProposalQueryKey(id) }
+    query: {
+      enabled: !isNaN(id),
+      queryKey: getGetProposalQueryKey(id),
+      // Poll every 15 s while any email is still awaiting delivery confirmation
+      refetchInterval: (query) => {
+        const log = (query.state.data as any)?.emailLog as Array<{ status?: string }> | undefined
+        return log?.some((e) => !e.status || e.status === "sent") ? 15_000 : false
+      },
+    }
   })
 
   // Auto-open edit mode when navigated here with ?edit=true
@@ -726,11 +734,52 @@ export default function ProposalDetail() {
 
           {/* Email History */}
           {(() => {
-            const log = ((proposal as any).emailLog ?? []) as Array<{ sentAt: string; to: string; recipientName?: string }>
+            type EmailEntry = {
+              emailLogId?: string
+              sentAt: string
+              to: string
+              recipientName?: string
+              status?: "sent" | "delivered" | "opened" | "bounced" | "spam"
+              deliveredAt?: string
+              openedAt?: string
+              bounceReason?: string
+            }
+            const log = ((proposal as any).emailLog ?? []) as EmailEntry[]
             if (log.length === 0) return null
             const sorted = [...log].sort(
               (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
             )
+            const hasPending = log.some((e) => !e.status || e.status === "sent")
+
+            const statusBadge = (entry: EmailEntry) => {
+              const s = entry.status ?? "sent"
+              if (s === "delivered") return (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                  ✓ Delivered{entry.deliveredAt ? ` · ${new Date(entry.deliveredAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}` : ""}
+                </span>
+              )
+              if (s === "opened") return (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                  👁 Opened{entry.openedAt ? ` · ${new Date(entry.openedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}` : ""}
+                </span>
+              )
+              if (s === "bounced") return (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
+                  ✗ Bounced{entry.bounceReason ? ` — ${entry.bounceReason}` : ""}
+                </span>
+              )
+              if (s === "spam") return (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
+                  ⚠ Spam Report
+                </span>
+              )
+              return (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  ⏳ Awaiting confirmation
+                </span>
+              )
+            }
+
             return (
               <Card>
                 <CardHeader className="pb-3">
@@ -738,21 +787,27 @@ export default function ProposalDetail() {
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     Email History
                     <Badge variant="secondary">{log.length}</Badge>
+                    {hasPending && (
+                      <span className="ml-auto text-[10px] font-normal text-muted-foreground animate-pulse">
+                        checking delivery…
+                      </span>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 px-4 pb-4">
                   {sorted.map((entry, i) => (
-                    <div key={i} className="flex flex-col gap-0.5 bg-background border rounded-md p-3 text-sm">
+                    <div key={i} className="flex flex-col gap-1 bg-background border rounded-md p-3 text-sm">
                       {entry.recipientName
                         ? <div className="font-medium">{entry.recipientName}</div>
                         : <div className="text-muted-foreground italic text-xs">No name recorded</div>
                       }
                       <div className="font-mono text-xs text-primary">{entry.to}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
+                      <div className="text-xs text-muted-foreground">
                         {new Date(entry.sentAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
                         {" at "}
                         {new Date(entry.sentAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                       </div>
+                      <div className="mt-0.5">{statusBadge(entry)}</div>
                     </div>
                   ))}
                 </CardContent>

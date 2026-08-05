@@ -25,9 +25,14 @@ const router: IRouter = Router();
 // ── Email-log helpers ─────────────────────────────────────────────────────────
 
 interface EmailLogEntry {
+  emailLogId: string;
   sentAt: string;
   to: string;
   recipientName?: string;
+  status: "sent" | "delivered" | "opened" | "bounced" | "spam";
+  deliveredAt?: string;
+  openedAt?: string;
+  bounceReason?: string;
 }
 
 function parseEmailLog(raw: unknown): EmailLogEntry[] {
@@ -342,6 +347,10 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
       return;
     }
 
+    // Unique ID so the SendGrid webhook can find this exact log entry
+    const emailLogId =
+      Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
     // Send the email via SendGrid
     await sendProposalEmail({
       to,
@@ -350,13 +359,17 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
       outreachLetter: proposal.outreachLetter ?? "",
       courses: proposal.courses as Parameters<typeof sendProposalEmail>[0]["courses"],
       costAnalysis: proposal.costAnalysis as Parameters<typeof sendProposalEmail>[0]["costAnalysis"],
+      proposalId,
+      emailLogId,
     });
 
     // Append to emailLog so we can track send history
     const existingLog = parseEmailLog(proposal.emailLog);
     const newEntry: EmailLogEntry = {
+      emailLogId,
       sentAt: new Date().toISOString(),
       to,
+      status: "sent",
       ...(recipientName ? { recipientName } : {}),
     };
     const updatedLog = [...existingLog, newEntry];

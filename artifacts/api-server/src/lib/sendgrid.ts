@@ -25,6 +25,7 @@ export interface SendProposalEmailParams {
   collegeName: string;
   outreachLetter: string;
   proposalId?: number;
+  emailLogId?: string;
   courses?: CourseSummary[] | null;
   costAnalysis?: CostAnalysisSummary | null;
 }
@@ -274,5 +275,15 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
     subject: `Zhi Systems AI Courseware Proposal — ${collegeName}`,
     text: cleanLetter,
     html,
+    // custom_args are echoed back in every SendGrid webhook event so the
+    // webhook handler can find the exact log entry to update
+    ...(params.proposalId != null && params.emailLogId
+      ? {
+          customArgs: {
+            proposalId: String(params.proposalId),
+            emailLogId: params.emailLogId,
+          },
+        }
+      : {}),
   });
 }
