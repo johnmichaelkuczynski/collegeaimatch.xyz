@@ -46,6 +46,7 @@ export default function CollegeDetail() {
   const [scratchLetter, setScratchLetter] = React.useState('')
   const [scratchSaving, setScratchSaving] = React.useState(false)
   const [selectedCourseIdxs, setSelectedCourseIdxs] = React.useState<Set<number>>(new Set())
+  const [selectionChartOpen, setSelectionChartOpen] = React.useState(false)
 
   const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
@@ -639,6 +640,15 @@ export default function CollegeDetail() {
                     Full Proposal
                   </Button>
                   <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-emerald-500/50 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                    onClick={() => setSelectionChartOpen(true)}
+                    disabled={!courses}
+                  >
+                    📊 View ROI
+                  </Button>
+                  <Button
                     size="lg"
                     className="font-bold shadow-md"
                     onClick={() => {
@@ -673,6 +683,165 @@ export default function CollegeDetail() {
           </div>
         </div>
       </div>
+
+      {/* SELECTION ROI CHART DIALOG */}
+      <Dialog open={selectionChartOpen} onOpenChange={setSelectionChartOpen}>
+        <DialogContent className="max-w-3xl p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              📊 Selection ROI — {selectedCourseIdxs.size} course{selectedCourseIdxs.size !== 1 ? 's' : ''} selected
+            </DialogTitle>
+            <DialogDescription>
+              Projected annual savings for {college.name} if these courses switch to Zhi AI courseware.
+            </DialogDescription>
+          </DialogHeader>
+
+          {(() => {
+            const selectedCourses = courses?.filter((_, i) => selectedCourseIdxs.has(i)) ?? []
+            const perCourse = selectedCourses.map(c => {
+              const est = estimateCourseCosts(
+                c.estimatedEnrollment ?? 0,
+                (c.failRate ?? 0) / 100,
+                isCommunity
+              )
+              return {
+                name: c.name.length > 22 ? c.name.slice(0, 20) + '…' : c.name,
+                fullName: c.name,
+                current: est.directCost,
+                ai: est.zhiAnnual,
+                savings: est.directCost - est.zhiAnnual,
+                failRate: c.failRate,
+                enrollment: c.estimatedEnrollment,
+              }
+            })
+            const totalCurrent = perCourse.reduce((s, c) => s + c.current, 0)
+            const totalAI = perCourse.reduce((s, c) => s + c.ai, 0)
+            const totalSavings = totalCurrent - totalAI
+            const setupCost = selectedCourses.length * 85_000
+
+            const comparisonData = [
+              { name: 'Current Costs', value: totalCurrent },
+              { name: 'With AI', value: totalAI },
+            ]
+
+            return (
+              <div className="px-6 py-5 space-y-5">
+                {/* Summary row */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border bg-destructive/5 p-3 text-center">
+                    <div className="text-xs text-muted-foreground mb-1">Current Annual Cost</div>
+                    <div className="text-lg font-mono font-bold text-destructive">{formatCurrency(totalCurrent)}</div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                    <div className="text-xs text-muted-foreground mb-1">Zhi AI Annual License</div>
+                    <div className="text-lg font-mono font-bold">{formatCurrency(totalAI)}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">+ {formatCurrency(setupCost)} setup (one-time)</div>
+                  </div>
+                  <div className="rounded-lg border bg-emerald-500/10 border-emerald-500/30 p-3 text-center">
+                    <div className="text-xs text-muted-foreground mb-1">Annual Savings</div>
+                    <div className="text-lg font-mono font-bold text-emerald-600">{formatCurrency(totalSavings)}</div>
+                  </div>
+                </div>
+
+                {/* Charts row */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Bar chart: Current vs AI */}
+                  <div>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Current Burden vs. AI Integration</div>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                          <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} tick={{ fontSize: 10 }} width={45} />
+                          <Tooltip formatter={(v: number) => formatCurrency(v)} cursor={{ fill: 'hsl(var(--muted))' }} />
+                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                            <Cell fill="hsl(var(--destructive))" />
+                            <Cell fill="#16a34a" />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Horizontal bar: savings per course */}
+                  <div>
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Annual Savings per Course</div>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={perCourse} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                          <XAxis type="number" tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} tick={{ fontSize: 9 }} />
+                          <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} width={80} />
+                          <Tooltip
+                            formatter={(v: number) => formatCurrency(v)}
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName ?? label}
+                            cursor={{ fill: 'hsl(var(--muted))' }}
+                          />
+                          <Bar dataKey="savings" radius={[0, 4, 4, 0]} fill="#16a34a" name="Annual Savings" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-course table */}
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Course</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Enrollment</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Fail Rate</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Current/yr</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">AI/yr</th>
+                        <th className="text-right px-3 py-2 font-medium text-emerald-600">Saves/yr</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {perCourse.map((c, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="px-3 py-2 font-medium">{c.fullName}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{c.enrollment?.toLocaleString() ?? '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            <span className={(c.failRate ?? 0) > 20 ? 'text-destructive font-semibold' : ''}>{c.failRate ? `${c.failRate}%` : '—'}</span>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">{formatCurrency(c.current)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-emerald-600">{formatCurrency(c.ai)}</td>
+                          <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(c.savings)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t bg-emerald-50/50 dark:bg-emerald-950/20 font-semibold">
+                        <td className="px-3 py-2" colSpan={3}>Total</td>
+                        <td className="px-3 py-2 text-right font-mono">{formatCurrency(totalCurrent)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-emerald-600">{formatCurrency(totalAI)}</td>
+                        <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(totalSavings)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
+
+          <DialogFooter className="px-6 py-4 border-t">
+            <Button variant="outline" onClick={() => setSelectionChartOpen(false)}>Close</Button>
+            <Button
+              className="font-bold"
+              onClick={() => {
+                setSelectionChartOpen(false)
+                const selected = courses!.filter((_, i) => selectedCourseIdxs.has(i))
+                handleGenerateProposal(undefined, undefined, false, selected)
+              }}
+              disabled={generateProposal.isPending || !costAnalysis}
+            >
+              {generateProposal.isPending
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
+                : <>Pitch {selectedCourseIdxs.size} Selected <ArrowRight className="ml-2 h-4 w-4" /></>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* WRITE FROM SCRATCH DIALOG */}
       <Dialog open={scratchOpen} onOpenChange={(v) => !v && setScratchOpen(false)}>
