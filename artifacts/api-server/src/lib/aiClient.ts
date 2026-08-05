@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { buildImpactSummaryForPrompt, CATALOG_AVERAGES } from "./courseImpactData";
 
 // ─── OpenAI (GPT-4o-mini) ────────────────────────────────────────────────────
 
@@ -326,52 +327,90 @@ export async function generateCostAnalysis(
 
 export type OutreachTone = "formal" | "direct" | "provocative" | "consultative" | "urgency";
 
+// ── Two-deployment-model instructions injected into every tone prompt ─────────
+const TWO_MODEL_INSTRUCTIONS = `
+CRITICAL — TWO DEPLOYMENT OPTIONS:
+Zhi Systems courses can be deployed in two distinct ways, and BOTH must be presented clearly in every letter:
+
+OPTION A — FULL REPLACEMENT: The Zhi AI course entirely replaces the human-taught section.
+  • The college eliminates its instructor cost for that course.
+  • Students experience AI-powered, 24/7 instruction with verified mastery checkpoints.
+  • This option maximizes savings but may raise faculty governance concerns — acknowledge this honestly.
+
+OPTION B — SUPPLEMENTAL / PREREQUISITE (the lower-risk entry point): The Zhi AI course is offered
+  as a prep course that students take BEFORE enrolling in the college's existing human-taught section.
+  • The college's instructors remain in place — no displacement concerns.
+  • Students who complete the Zhi prep course arrive better prepared, which raises pass rates and
+    retention in BOTH the target course AND in subsequent related courses.
+  • Empirical outcome data is provided — reference the specific figures in the user prompt.
+  • This option costs less to implement, is far easier to get past faculty governance, and still
+    delivers measurable ROI through improved outcomes and reduced retake/dropout costs.
+
+Structure the letter so that:
+1. You lead with OPTION B (supplemental) as the non-threatening, easy-win entry point.
+   Cite the specific pass-rate, retention, and follow-up-class improvements from the data provided.
+2. You present OPTION A (full replacement) as an optional next step for institutions ready for deeper
+   transformation — something they can grow into, not something being forced on them.
+3. The framing is: "Start where you're comfortable. The data is compelling either way."
+
+Do NOT make administrators feel their faculty are threatened. Lead with outcomes, not displacement.`;
+
 const TONE_SYSTEM_PROMPTS: Record<OutreachTone, string> = {
   formal: `You are a senior business development writer for Zhi Systems, an AI courseware company.
 Write a compelling, specific outreach proposal letter for a college. The letter must:
 - Be addressed to the primary decision-maker by name and title
 - Reference specific institutional data (enrollment, dropout rates, tuition, specific courses)
-- Explain exactly which courses Zhi Systems recommends replacing with AI versions and why
+- Present BOTH deployment options (supplemental prep course AND full replacement) — see instructions below
 - Include specific cost figures (current delivery cost vs AI costs) with precise dollar amounts
+- Cite the empirical outcome data (pass-rate/retention improvements) provided for the specific courses
 - Reference the AI virtues/features that matter most to this institution
 - Close with concrete next steps
 - Sound authoritative, data-driven, and specific — NOT generic
 - Be formatted as a proper business letter (date, salutation, body paragraphs, closing)
 - Be approximately 600-900 words
 - The letter is from Douglas Fong at Zhi Systems. Use his name and contact details in the closing signature: Douglas Fong, zhi@zhisystems.org, 845-240-4235, https://zhisystems.ai/
-Return the letter as plain text with standard letter formatting. No JSON wrapper.`,
+Return the letter as plain text with standard letter formatting. No JSON wrapper.
+${TWO_MODEL_INSTRUCTIONS}`,
 
   direct: `You are a no-nonsense business development rep for Zhi Systems AI courseware.
 Write a direct, numbers-first outreach letter. OPEN IMMEDIATELY with the financial headline — zero pleasantries.
 Format the opening as: "[Title] [Last Name]: [College] is losing $[X] annually to course failures across [N] gateway courses. We can cut that number in half. Here's the math."
-Then: data → cost table → specific course recommendations → crisp call to action.
+Then: data → outcome improvements (cite the pass-rate/retention figures from the data provided) → two deployment options → cost figures → crisp call to action.
 NO "I hope this letter finds you well." NO warm-up. Lead with the problem and the dollar amount.
+Present BOTH options (supplemental prep course and full replacement) — see instructions below.
 Approximately 400-600 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235, https://zhisystems.ai/
-Return plain text. No JSON wrapper.`,
+Return plain text. No JSON wrapper.
+${TWO_MODEL_INSTRUCTIONS}`,
 
   provocative: `You are a bold, results-focused rep for Zhi Systems writing a deliberately provocative outreach letter.
 Open by naming the failure directly and unapologetically. Example: "Your [course] program has a [X]% fail rate and costs $[amount]/year to deliver [N] students poor outcomes. We'll do it for $[amount] with better results. Want to see the proof, or just sign the contract?"
-Be audacious but not unprofessional — back every claim with the real numbers from the data provided.
+Be audacious but not unprofessional — back every claim with the real numbers from the data provided, including the empirical outcome improvements.
 Challenge the status quo, contrast current costs against Zhi pricing starkly, and make inaction feel costly.
+Present BOTH deployment options (supplemental and full replacement) — see instructions below.
 Approximately 400-600 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235, https://zhisystems.ai/
-Return plain text. No JSON wrapper.`,
+Return plain text. No JSON wrapper.
+${TWO_MODEL_INSTRUCTIONS}`,
 
   consultative: `You are a strategic higher-education consultant writing on behalf of Zhi Systems.
 Write a consultative, peer-to-peer letter — not a sales pitch. Position this as a shared industry challenge.
 Reference sector-wide trends: AI adoption in community colleges, the national DFW (drop/fail/withdraw) crisis, budget pressures on instructional staff.
 Frame Zhi Systems as a collaborative partner addressing systemic pressures, not a vendor pushing product.
-Cite comparable institutions (without naming them) that have piloted AI-enhanced courses with measurable outcome improvements.
-Acknowledge faculty governance concerns; position Zhi as supplemental to, not replacement for, faculty authority.
+Cite the specific empirical outcome data provided (pass-rate improvements, retention, follow-up course performance) as evidence from real cohort studies.
+Acknowledge faculty governance concerns explicitly; position the supplemental option as a way to SUPPORT faculty by sending better-prepared students to their classrooms.
+Present BOTH deployment options (supplemental and full replacement) — see instructions below.
 Approximately 700-900 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235, https://zhisystems.ai/
-Return plain text. No JSON wrapper.`,
+Return plain text. No JSON wrapper.
+${TWO_MODEL_INSTRUCTIONS}`,
 
   urgency: `You are a business development rep for Zhi Systems writing an urgency-driven outreach letter.
 Create real momentum: reference limited pilot capacity, other institutions already in the program, and the competitive disadvantage of waiting.
 Imply a finite window — pilot cohort enrollment closes, peer institutions are gaining first-mover advantage in AI courseware adoption.
 Be specific about timelines or cohort limits. Don't be gimmicky — make the urgency feel grounded in real market dynamics.
-Use institution-specific data to show that waiting another year means another year of the same dropout losses.
+Use institution-specific data to show that waiting another year means another year of the same dropout losses — and cite the outcome improvement figures provided.
+Present BOTH deployment options (supplemental and full replacement) — see instructions below.
 Approximately 500-700 words. Close with Douglas Fong's name, zhi@zhisystems.org, 845-240-4235, https://zhisystems.ai/
-Return plain text. No JSON wrapper.`,
+Return plain text. No JSON wrapper.
+${TWO_MODEL_INSTRUCTIONS}`,
 };
 
 export async function generateOutreachLetter(params: {
@@ -433,6 +472,14 @@ Structure the letter as follows:
 Do NOT mention other courses or imply a broader catalog pitch.`;
   }
 
+  // Build course-specific outcome data from empirical catalog
+  const courseNamesForLookup = courses.map((c) => c.name);
+  const impactSummary = buildImpactSummaryForPrompt(courseNamesForLookup);
+
+  // Compute avg pass-rate lift across matched courses for headline use
+  const avgPassLift = CATALOG_AVERAGES.eightWeek.passRateIncrease;
+  const avgRetentionLift = CATALOG_AVERAGES.eightWeek.retentionRateIncrease;
+
   const userPrompt = `Date: ${today}
 Sender: Douglas Fong, Zhi Systems | zhi@zhisystems.org | 845-240-4235
 
@@ -446,7 +493,7 @@ Primary contact: ${primaryContact?.name ?? "Dr. Academic Vice President"}, ${pri
 
 ${subset
   ? `Selected courses to pitch (${courses.length} total):\n\n${perCourseTable}`
-  : `Priority courses for AI replacement:\n${priorityCourses || "Remedial Math, Ethics, Critical Thinking, Psychology 101"}`
+  : `Priority courses for AI deployment:\n${priorityCourses || "Remedial Math, Ethics, Critical Thinking, Psychology 101"}`
 }
 
 AI course features: ${virtueList}
@@ -459,7 +506,23 @@ Recurring annual savings: $${costAnalysis.savingsAnnual.toLocaleString()}
 Total cost without AI: $${costAnalysis.totalCostWithoutAI.toLocaleString()}
 Total cost with AI (year 1): $${costAnalysis.totalCostWithAI.toLocaleString()}
 
-Write a specific, data-driven outreach letter for this institution.`;
+─── EMPIRICAL OUTCOME DATA (SUPPLEMENTAL USE CASE) ───────────────────────────
+The following figures measure what happens when students take the Zhi AI course
+as a PREREQUISITE before the college's human-taught section. Use these numbers
+concretely in the letter to support the Option B (supplemental) pitch.
+Average across catalog: ~+${avgPassLift}% pass rate, ~+${avgRetentionLift}% retention in the target course.
+
+Course-specific data (8-week full course format):
+${impactSummary}
+
+Follow-up course effects: improvements carry forward into subsequent related courses
+at roughly 60–70% of the primary gain (e.g. a +30% pass lift in Intro Programming
+translates to ~+19% pass lift in Data Structures taken the following semester).
+──────────────────────────────────────────────────────────────────────────────
+
+Write a specific, data-driven outreach letter for this institution. Remember to present
+BOTH deployment options clearly: Option B (supplemental/prerequisite — easy entry, no faculty displacement)
+first, then Option A (full replacement — maximum savings) as a growth path.`;
 
   const raw = await openaiChat(systemPrompt, userPrompt, false);
 
