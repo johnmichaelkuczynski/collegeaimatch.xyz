@@ -458,6 +458,7 @@ Write a specific, data-driven outreach letter for this institution.`;
 
   // Replace any placeholder tokens the AI emits despite being told not to
   const letter = raw
+    .replace(/\*\*/g, "")          // strip markdown bold that leaks into plain-text output
     .replace(/\[Date\]/gi, today)
     .replace(/\[Your Name\]/gi, "Douglas Fong")
     .replace(/\[Your Email(?: Address)?\]/gi, "zhi@zhisystems.org")

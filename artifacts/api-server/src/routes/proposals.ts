@@ -348,6 +348,8 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
       recipientName: recipientName ?? undefined,
       collegeName: proposal.collegeName,
       outreachLetter: proposal.outreachLetter ?? "",
+      courses: proposal.courses as Parameters<typeof sendProposalEmail>[0]["courses"],
+      costAnalysis: proposal.costAnalysis as Parameters<typeof sendProposalEmail>[0]["costAnalysis"],
     });
 
     // Append to emailLog so we can track send history
