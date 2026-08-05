@@ -67,6 +67,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
   const pitchMode = rawBody.pitchMode === true;
   const collegeCity = typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";
   const tone = typeof rawBody.tone === "string" ? rawBody.tone as import("../lib/aiClient").OutreachTone : "formal";
+  const subset = rawBody.subset === true;
 
   try {
     const collegeInfo: CollegeInfo = {
@@ -148,6 +149,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
       aiVirtues: input.aiVirtues ?? [],
       costAnalysis,
       tone,
+      subset,
     });
 
     const prioritizedCourses = [...courses].sort(

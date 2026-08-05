@@ -31,6 +31,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -44,6 +45,7 @@ export default function CollegeDetail() {
   const [scratchOpen, setScratchOpen] = React.useState(false)
   const [scratchLetter, setScratchLetter] = React.useState('')
   const [scratchSaving, setScratchSaving] = React.useState(false)
+  const [selectedCourseIdxs, setSelectedCourseIdxs] = React.useState<Set<number>>(new Set())
 
   const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
@@ -68,9 +70,11 @@ export default function CollegeDetail() {
   const generateProposal = useGenerateProposal()
   const saveProposal = useCreateProposal()
 
-  const handleGenerateProposal = (singleCourse?: Course, toneOverride?: string, editAfter?: boolean) => {
+  const handleGenerateProposal = (singleCourse?: Course, toneOverride?: string, editAfter?: boolean, coursesOverride?: Course[]) => {
     if (!college) return
     const activeTone = toneOverride ?? (tone !== 'manual' ? tone : 'formal')
+    const activeCourses = coursesOverride ?? (singleCourse ? [singleCourse] : courses)
+    const isSubset = !!coursesOverride && !singleCourse
     const generateData = {
       collegeId: college.id,
       collegeName: college.name,
@@ -80,11 +84,12 @@ export default function CollegeDetail() {
       collegeType: college.type,
       enrollmentSize: college.enrollmentSize,
       dropoutRate: college.dropoutRate || undefined,
-      courses: singleCourse ? [singleCourse] : courses,
+      courses: activeCourses,
       contacts: contacts,
       costAnalysis: costAnalysis,
       tone: activeTone,
       ...(singleCourse ? { pitchMode: true } : {}),
+      ...(isSubset ? { subset: true } : {}),
     }
     generateProposal.mutate(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -263,6 +268,17 @@ export default function CollegeDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10 pl-4">
+                      <Checkbox
+                        checked={courses.length > 0 && selectedCourseIdxs.size === courses.length}
+                        data-state={selectedCourseIdxs.size > 0 && selectedCourseIdxs.size < courses.length ? "indeterminate" : undefined}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedCourseIdxs(new Set(courses.map((_, i) => i)))
+                          else setSelectedCourseIdxs(new Set())
+                        }}
+                        aria-label="Select all courses"
+                      />
+                    </TableHead>
                     <TableHead>Course</TableHead>
                     <TableHead className="text-right">Enrollment</TableHead>
                     <TableHead className="text-right">Fail Rate</TableHead>
@@ -279,7 +295,28 @@ export default function CollegeDetail() {
                       isCommunity
                     )
                     return (
-                    <TableRow key={i} className={course.isHighPriority ? "bg-primary/5" : ""}>
+                    <TableRow
+                      key={i}
+                      className={`cursor-pointer ${course.isHighPriority ? "bg-primary/5" : ""} ${selectedCourseIdxs.has(i) ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
+                      onClick={() => setSelectedCourseIdxs(prev => {
+                        const next = new Set(prev)
+                        if (next.has(i)) next.delete(i)
+                        else next.add(i)
+                        return next
+                      })}
+                    >
+                      <TableCell className="w-10 pl-4" onClick={e => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedCourseIdxs.has(i)}
+                          onCheckedChange={() => setSelectedCourseIdxs(prev => {
+                            const next = new Set(prev)
+                            if (next.has(i)) next.delete(i)
+                            else next.add(i)
+                            return next
+                          })}
+                          aria-label={`Select ${course.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {course.name}
@@ -579,10 +616,47 @@ export default function CollegeDetail() {
                   </Button>
                 </div>
               </>
+            ) : selectedCourseIdxs.size > 0 ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium tabular-nums">
+                    {selectedCourseIdxs.size} course{selectedCourseIdxs.size !== 1 ? 's' : ''} selected
+                  </span>
+                  <button
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    onClick={() => setSelectedCourseIdxs(new Set())}
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleGenerateProposal()}
+                    disabled={generateProposal.isPending || !costAnalysis || !courses}
+                  >
+                    Full Proposal
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="font-bold shadow-md"
+                    onClick={() => {
+                      const selected = courses!.filter((_, i) => selectedCourseIdxs.has(i))
+                      handleGenerateProposal(undefined, undefined, false, selected)
+                    }}
+                    disabled={generateProposal.isPending || !costAnalysis || !courses}
+                  >
+                    {generateProposal.isPending
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
+                      : <>Pitch {selectedCourseIdxs.size} Selected <ArrowRight className="ml-2 h-4 w-4" /></>}
+                  </Button>
+                </div>
+              </>
             ) : (
               <>
                 <p className="text-xs text-muted-foreground hidden lg:block">
-                  {courses?.length || 0} courses · use <strong>Pitch</strong> for single-course
+                  {courses?.length || 0} courses · check rows to pitch a subset
                 </p>
                 <Button
                   size="lg"
@@ -592,7 +666,7 @@ export default function CollegeDetail() {
                 >
                   {generateProposal.isPending
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
-                    : <>Generate Proposal <ArrowRight className="ml-2 h-4 w-4" /></>}
+                    : <>Generate Full Proposal <ArrowRight className="ml-2 h-4 w-4" /></>}
                 </Button>
               </>
             )}

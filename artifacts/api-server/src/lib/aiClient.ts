@@ -381,14 +381,27 @@ export async function generateOutreachLetter(params: {
   aiVirtues: string[];
   costAnalysis: CostAnalysisData;
   tone?: OutreachTone;
+  subset?: boolean;
 }): Promise<string> {
-  const { college, courses, contacts, aiVirtues, costAnalysis, tone = "formal" } = params;
+  const { college, courses, contacts, aiVirtues, costAnalysis, tone = "formal", subset = false } = params;
 
   const priorityCourses = courses
     .filter((c) => c.isHighPriority)
     .slice(0, 8)
     .map((c, i) => `${i + 1}. ${c.name} — ${c.subject}`)
     .join("\n");
+
+  // Per-course breakdown for subset mode
+  const perCourseTable = courses
+    .map((c, i) => {
+      const current = c.estimatedAnnualCost ?? 0;
+      const aiAnnual = c.aiAnnualCost ?? 18_000;
+      const savings = current - aiAnnual;
+      return `${i + 1}. ${c.name} (${c.subject})
+   Enrollment: ${c.estimatedEnrollment?.toLocaleString() ?? "?"} · Fail rate: ${c.failRate ?? "?"}%
+   Current delivery cost: $${current.toLocaleString()} · Zhi AI license: $${aiAnnual.toLocaleString()}/yr · Annual savings: $${savings.toLocaleString()}`;
+    })
+    .join("\n\n");
 
   const virtueList =
     aiVirtues.length > 0
@@ -400,7 +413,18 @@ export async function generateOutreachLetter(params: {
 
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
-  const systemPrompt = TONE_SYSTEM_PROMPTS[tone] ?? TONE_SYSTEM_PROMPTS.formal;
+  let systemPrompt = TONE_SYSTEM_PROMPTS[tone] ?? TONE_SYSTEM_PROMPTS.formal;
+
+  // Append subset-specific writing instructions
+  if (subset) {
+    systemPrompt += `\n\nIMPORTANT — This letter pitches ONLY the ${courses.length} specifically selected course(s) listed, NOT the institution's full catalog.
+Structure the letter as follows:
+1. Open by identifying the ${courses.length} course(s) and leading immediately with the AGGREGATE annual savings ($${costAnalysis.savingsAnnual.toLocaleString()}/yr).
+2. Dedicate a short paragraph to each course, citing its enrollment, fail rate, current cost, and AI cost.
+3. Present the total setup investment ($${costAnalysis.totalAiInstallCost.toLocaleString()} one-time) and annual license ($${costAnalysis.totalAiAnnualCost.toLocaleString()}/yr across all ${courses.length} courses).
+4. Close with a concrete next-step CTA.
+Do NOT mention other courses or imply a broader catalog pitch.`;
+  }
 
   const userPrompt = `Date: ${today}
 Sender: Douglas Fong, Zhi Systems | zhi@zhisystems.org | 845-240-4235
@@ -413,8 +437,10 @@ In-state tuition: $${(college.tuitionInState ?? 8000).toLocaleString()}
 
 Primary contact: ${primaryContact?.name ?? "Dr. Academic Vice President"}, ${primaryContact?.title ?? "Provost"}
 
-Priority courses for AI replacement:
-${priorityCourses || "Remedial Math, Ethics, Critical Thinking, Psychology 101"}
+${subset
+  ? `Selected courses to pitch (${courses.length} total):\n\n${perCourseTable}`
+  : `Priority courses for AI replacement:\n${priorityCourses || "Remedial Math, Ethics, Critical Thinking, Psychology 101"}`
+}
 
 AI course features: ${virtueList}
 
