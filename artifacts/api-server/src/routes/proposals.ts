@@ -5,6 +5,7 @@ import {
   GetProposalParams,
   DeleteProposalParams,
   CreateProposalBody,
+  GenerateProposalBody,
 } from "@workspace/api-zod";
 import {
   generateOutreachLetter,
@@ -76,15 +77,34 @@ router.get("/proposals", async (_req, res): Promise<void> => {
 // ── POST /proposals/generate — BEFORE /:id to avoid param capture ─────────────
 
 router.post("/proposals/generate", async (req, res): Promise<void> => {
-  const parsed = CreateProposalBody.safeParse(req.body);
+  // Pre-normalise body so GenerateProposalBody parses cleanly:
+  // - contacts need { institution } (required by schema but not always sent)
+  // - costAnalysis needs { collegeName, courses } (required by schema)
+  const rawBody = req.body as Record<string, unknown>;
+  const bodyForParse = { ...rawBody };
+  if (Array.isArray(bodyForParse.contacts)) {
+    bodyForParse.contacts = (bodyForParse.contacts as Record<string, unknown>[]).map((c) => ({
+      institution: bodyForParse.collegeName ?? "",
+      department: "",
+      ...c,
+    }));
+  }
+  if (bodyForParse.costAnalysis && typeof bodyForParse.costAnalysis === "object") {
+    bodyForParse.costAnalysis = {
+      collegeName: bodyForParse.collegeName ?? "",
+      courses: [],
+      ...(bodyForParse.costAnalysis as object),
+    };
+  }
+
+  const parsed = GenerateProposalBody.safeParse(bodyForParse);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
   const input = parsed.data;
 
-  // Read fields that aren't in the Zod schema (stripped by safeParse)
-  const rawBody = req.body as Record<string, unknown>;
+  // Extra fields not in the Zod schema
   const pitchMode = rawBody.pitchMode === true;
   const collegeCity =
     typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";

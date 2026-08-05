@@ -4,7 +4,7 @@ import {
   ArrowLeft, Download, Send, Copy, FileText, CheckCircle2,
   Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye, Clock, AlertTriangle
 } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
 import { pdf } from "@react-pdf/renderer"
 
 import { useGetProposal, getGetProposalQueryKey } from "@workspace/api-client-react"
@@ -422,6 +422,128 @@ export default function ProposalDetail() {
           </Button>
         </div>
       </div>
+
+      {/* ── ROI Chart Panel ─────────────────────────────────────────────────── */}
+      {costAnalysis && courses && courses.length > 0 && (() => {
+        const perCourse = courses.map((c) => ({
+          name: (c.name ?? "").length > 20 ? (c.name ?? "").slice(0, 18) + "…" : (c.name ?? ""),
+          fullName: c.name ?? "",
+          current: (c as any).estimatedAnnualCost ?? 0,
+          ai: c.aiAnnualCost ?? 18_000,
+          savings: ((c as any).estimatedAnnualCost ?? 0) - (c.aiAnnualCost ?? 18_000),
+          failRate: (c as any).failRate,
+        }))
+
+        const comparisonData = [
+          { name: "Current Costs", value: costAnalysis.totalCurrentAnnualCost },
+          { name: "With AI", value: costAnalysis.totalAiAnnualCost },
+        ]
+
+        return (
+          <Card className="border-emerald-500/20 bg-gradient-to-br from-background to-emerald-50/20 dark:to-emerald-950/10">
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="flex items-center gap-2 text-base">
+                📊 Selection ROI Analysis
+                <span className="text-sm font-normal text-muted-foreground">— {courses.length} course{courses.length !== 1 ? "s" : ""}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              {/* Summary tiles */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border bg-destructive/5 p-3 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Current Annual Cost</div>
+                  <div className="text-base font-mono font-bold text-destructive">{formatCurrency(costAnalysis.totalCurrentAnnualCost)}</div>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Zhi AI Annual License</div>
+                  <div className="text-base font-mono font-bold">{formatCurrency(costAnalysis.totalAiAnnualCost)}</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">+ {formatCurrency(costAnalysis.totalAiInstallCost)} setup</div>
+                </div>
+                <div className="rounded-lg border bg-emerald-500/10 border-emerald-500/30 p-3 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Annual Savings</div>
+                  <div className="text-base font-mono font-bold text-emerald-600">{formatCurrency(costAnalysis.savingsAnnual)}</div>
+                </div>
+              </div>
+
+              {/* Charts */}
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Current vs AI bar */}
+                <div>
+                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Current Burden vs. AI Integration</div>
+                  <div className="h-[180px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                        <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                        <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} tick={{ fontSize: 10 }} width={42} />
+                        <RechartsTooltip formatter={(v: number) => formatCurrency(v)} cursor={{ fill: "hsl(var(--muted))" }} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          <Cell fill="hsl(var(--destructive))" />
+                          <Cell fill="#16a34a" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Per-course savings horizontal bars */}
+                <div>
+                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Annual Savings per Course</div>
+                  <div className="h-[180px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={perCourse} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                        <XAxis type="number" tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} tick={{ fontSize: 9 }} />
+                        <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 9 }} width={72} />
+                        <RechartsTooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          labelFormatter={(_l, payload) => payload?.[0]?.payload?.fullName ?? _l}
+                          cursor={{ fill: "hsl(var(--muted))" }}
+                        />
+                        <Bar dataKey="savings" radius={[0, 4, 4, 0]} fill="#16a34a" name="Annual Savings" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Per-course table */}
+              <div className="border rounded-lg overflow-hidden text-sm">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Course</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Fail Rate</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Current/yr</th>
+                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">AI/yr</th>
+                      <th className="text-right px-3 py-2 font-medium text-emerald-600">Saves/yr</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perCourse.map((c, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-3 py-1.5 font-medium">{c.fullName}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">
+                          <span className={(c.failRate ?? 0) > 20 ? "text-destructive font-semibold" : ""}>{c.failRate ? `${c.failRate}%` : "—"}</span>
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-mono">{formatCurrency(c.current)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-emerald-600">{formatCurrency(c.ai)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono font-bold text-emerald-600">{formatCurrency(c.savings)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t bg-emerald-50/50 dark:bg-emerald-950/20 font-semibold">
+                      <td className="px-3 py-2" colSpan={2}>Total</td>
+                      <td className="px-3 py-2 text-right font-mono">{formatCurrency(costAnalysis.totalCurrentAnnualCost)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-emerald-600">{formatCurrency(costAnalysis.totalAiAnnualCost)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(costAnalysis.savingsAnnual)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       <div className="grid md:grid-cols-3 gap-6">
         {/* Left Column: Letter */}
