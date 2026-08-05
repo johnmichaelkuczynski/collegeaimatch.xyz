@@ -305,6 +305,45 @@ export function ProposalPDF({ proposal }: { proposal: ProposalData }) {
           <Text style={{ color: brand.muted, fontSize: 9, marginBottom: 20 }}>No courses included in this proposal.</Text>
         )}
 
+        {/* Multi-Year Savings Projection */}
+        {costAnalysis?.savingsAnnual != null && costAnalysis.savingsAnnual > 0 && (() => {
+          const annual = costAnalysis.savingsAnnual ?? 0
+          const install = costAnalysis.totalAiInstallCost ?? 0
+          const rows = [
+            { year: "Year 1", cumulative: annual - install, note: "Annual savings minus one-time install cost" },
+            { year: "Year 2", cumulative: annual * 2 - install, note: "" },
+            { year: "Year 3", cumulative: annual * 3 - install, note: "" },
+            { year: "Year 5", cumulative: annual * 5 - install, note: "" },
+          ]
+          return (
+            <View style={{ marginBottom: 20 }}>
+              <Text style={s.sectionHeading}>Multi-Year Projection</Text>
+              {/* Header */}
+              <View style={s.tableHeader}>
+                <Text style={[s.tableHeaderText, { flex: 1 }]}>Period</Text>
+                <Text style={s.tableHeaderTextRight}>Cumulative Net Savings</Text>
+                <Text style={[s.tableHeaderText, { flex: 2, textAlign: "right" }]}>Notes</Text>
+              </View>
+              {rows.map((r, i) => (
+                <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                  <Text style={[s.tableCell, { flex: 1, fontFamily: "Helvetica-Bold" }]}>{r.year}</Text>
+                  <Text style={[s.tableCellRight, { color: r.cumulative >= 0 ? brand.accent : brand.danger }]}>
+                    {r.cumulative >= 0 ? usd(r.cumulative) : `-${usd(Math.abs(r.cumulative))}`}
+                  </Text>
+                  <Text style={[s.tableCell, { flex: 2, textAlign: "right", fontSize: 8, color: brand.muted }]}>
+                    {r.note}
+                  </Text>
+                </View>
+              ))}
+              <View style={{ flexDirection: "row", padding: "5 8", backgroundColor: brand.mutedBg, borderRadius: "0 0 4 4", borderWidth: 1, borderColor: brand.border, borderTopWidth: 0 }}>
+                <Text style={[s.tableCell, { flex: 1, fontSize: 8, color: brand.muted }]}>
+                  Based on {usd(annual)}/yr savings · {usd(install)} one-time install
+                </Text>
+              </View>
+            </View>
+          )
+        })()}
+
         {/* Key Contacts */}
         <Text style={s.sectionHeading}>Key Contacts</Text>
         {contacts && contacts.length > 0 ? (
