@@ -5,17 +5,16 @@ import {
   GetProposalParams,
   DeleteProposalParams,
   CreateProposalBody,
-  GenerateProposalBody,
 } from "@workspace/api-zod";
 import {
   generateOutreachLetter,
   generateCostAnalysis,
   generateCourses,
   generateContacts,
-  generateSingleCoursePitch,
   computeSingleCoursePitchNumbers,
   type CollegeInfo,
   type CourseData,
+  type OutreachTone,
 } from "../lib/aiClient";
 import { webSearch } from "../lib/serpapi";
 import { sendProposalEmail } from "../lib/sendgrid";
@@ -29,6 +28,16 @@ interface EmailLogEntry {
   to: string;
   recipientName?: string;
 }
+
+function parseEmailLog(raw: unknown): EmailLogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw as EmailLogEntry[];
+}
+
+// ── GET /proposals ────────────────────────────────────────────────────────────
+
+router.get("/proposals", async (_req, res): Promise<void> => {
+  try {
     const proposals = await db
       .select({
         id: proposalsTable.id,
@@ -64,7 +73,8 @@ interface EmailLogEntry {
   }
 });
 
-// POST /proposals/generate — must be BEFORE /:id to avoid param capture
+// ── POST /proposals/generate — BEFORE /:id to avoid param capture ─────────────
+
 router.post("/proposals/generate", async (req, res): Promise<void> => {
   const parsed = CreateProposalBody.safeParse(req.body);
   if (!parsed.success) {
@@ -73,13 +83,14 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
   }
   const input = parsed.data;
 
-  // Read fields that aren't in the Zod schema before parse strips them
+  // Read fields that aren't in the Zod schema (stripped by safeParse)
   const rawBody = req.body as Record<string, unknown>;
   const pitchMode = rawBody.pitchMode === true;
-  const collegeCity = typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";
-  const tone =
+  const collegeCity =
+    typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";
+  const tone: OutreachTone =
     typeof rawBody.tone === "string"
-      ? (rawBody.tone as import("../lib/aiClient").OutreachTone)
+      ? (rawBody.tone as OutreachTone)
       : "formal";
   const subset = rawBody.subset === true;
 
@@ -103,24 +114,8 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
     // ── Single-course pitch path ─────────────────────────────────────────────
     if (pitchMode && courses.length === 1) {
       const course = courses[0];
-    const outreachLetter = await generateOutreachLetter({
-      college: collegeInfo,
-      courses,
-      contacts: contacts.map((c) => ({
-        ...c,
-        institution: input.collegeName,
-      })),
-      aiVirtues: input.aiVirtues ?? [],
-      costAnalysis,
-      tone,
-      subset,
-    });
-
-      // Build a CostAnalysisData-shaped object from the pitch formula numbers
       const nums = computeSingleCoursePitchNumbers(course, collegeInfo.type);
       const pitchCostAnalysis = {
-        collegeName: input.collegeName,
-        courses,
         totalCurrentAnnualCost: nums.directCost,
         totalAiInstallCost: nums.zhiSetup,
         totalAiAnnualCost: nums.zhiAnnual,
@@ -131,20 +126,31 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
         savingsYear1: nums.savingsYear1,
         savingsAnnual: nums.savingsVsTrue,
       };
-
+      // Use generateOutreachLetter so tone is respected in pitch mode too
+      const outreachLetter = await generateOutreachLetter({
+        college: collegeInfo,
+        courses,
+        contacts: [],
+        aiVirtues: input.aiVirtues ?? [],
+        costAnalysis: pitchCostAnalysis,
+        tone,
+        subset: false,
+      });
       res.json({
         outreachLetter,
-        costAnalysis: pitchCostAnalysis,
+        costAnalysis: { collegeName: input.collegeName, courses, ...pitchCostAnalysis },
         prioritizedCourses: courses,
         executiveSummary: `Single-course pitch: ${course.name} at ${input.collegeName}. Saves ≈$${nums.savingsVsTrue.toLocaleString()} per year vs true cost. Zhi price: $${nums.zhiAnnual.toLocaleString()}/yr + $${nums.zhiSetup.toLocaleString()} one-time.`,
       });
       return;
     }
 
-    // ── Full multi-course proposal path ──────────────────────────────────────
+    // ── Full / subset multi-course proposal path ──────────────────────────────
 
-    // Use provided contacts or generate them
-    let contacts = (input.contacts ?? []) as Awaited<ReturnType<typeof generateContacts>>;
+    // Use provided contacts or generate them via web search
+    let contacts = (input.contacts ?? []) as Awaited<
+      ReturnType<typeof generateContacts>
+    >;
     if (contacts.length === 0) {
       const snippets = await webSearch(
         `"${input.collegeName}" provost OR "chief academic officer" OR "vice president academic"`
@@ -163,14 +169,11 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
       costAnalysis = await generateCostAnalysis(collegeInfo, courses);
     }
 
-    // Generate outreach letter
+    // Generate outreach letter with tone + subset flag
     const outreachLetter = await generateOutreachLetter({
       college: collegeInfo,
       courses,
-      contacts: contacts.map((c) => ({
-        ...c,
-        institution: input.collegeName,
-      })),
+      contacts: contacts.map((c) => ({ ...c, institution: input.collegeName })),
       aiVirtues: input.aiVirtues ?? [],
       costAnalysis,
       tone,
@@ -178,8 +181,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
     });
 
     const prioritizedCourses = [...courses].sort(
-      (a, b) =>
-        (b.estimatedAnnualCost ?? 0) - (a.estimatedAnnualCost ?? 0)
+      (a, b) => (b.estimatedAnnualCost ?? 0) - (a.estimatedAnnualCost ?? 0)
     );
 
     const executiveSummary = `${input.collegeName} currently spends an estimated $${costAnalysis.totalCurrentAnnualCost.toLocaleString()} annually delivering ${courses.length} courses that are prime AI replacement candidates. With Zhi Systems, the institution would save $${costAnalysis.savingsYear1.toLocaleString()} in the first year and $${costAnalysis.savingsAnnual.toLocaleString()} every year thereafter.`;
@@ -196,7 +198,8 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
   }
 });
 
-// POST /proposals
+// ── POST /proposals ───────────────────────────────────────────────────────────
+
 router.post("/proposals", async (req, res): Promise<void> => {
   const parsed = CreateProposalBody.safeParse(req.body);
   if (!parsed.success) {
@@ -207,22 +210,30 @@ router.post("/proposals", async (req, res): Promise<void> => {
 
   try {
     const [proposal] = await db
-      .select()
-      .from(proposalsTable)
-      .where(eq(proposalsTable.id, proposalId));
+      .insert(proposalsTable)
+      .values({
+        collegeName: input.collegeName,
+        collegeState: input.collegeState,
+        courses: input.courses ?? [],
+        contacts: input.contacts ?? [],
+        aiVirtues: input.aiVirtues ?? [],
+        outreachLetter: input.outreachLetter ?? "",
+        costAnalysis: input.costAnalysis ?? null,
+      })
+      .returning();
 
-    if (!proposal) {
-      res.status(404).json({ error: "Proposal not found" });
-      return;
-    }
+    res.status(201).json(proposal);
+  } catch (err) {
+    req.log.error({ err }, "Create proposal failed");
+    res.status(500).json({ error: "Failed to create proposal" });
+  }
+});
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+// ── GET /proposals/:id ────────────────────────────────────────────────────────
 
-    const emailLog = parseEmailLog(proposal.emailLog);
-
-    const emailLog = parseEmailLog(proposal.emailLog);
+router.get("/proposals/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = DeleteProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
+  const params = GetProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -232,18 +243,23 @@ router.post("/proposals", async (req, res): Promise<void> => {
     const [proposal] = await db
       .select()
       .from(proposalsTable)
-      .where(eq(proposalsTable.id, proposalId));
+      .where(eq(proposalsTable.id, params.data.proposalId));
 
     if (!proposal) {
       res.status(404).json({ error: "Proposal not found" });
       return;
     }
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+    res.json(proposal);
+  } catch (err) {
+    req.log.error({ err }, "Get proposal failed");
+    res.status(500).json({ error: "Failed to get proposal" });
+  }
+});
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+// ── PATCH /proposals/:id — update outreach letter ─────────────────────────────
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+router.patch("/proposals/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const proposalId = parseInt(raw, 10);
   if (isNaN(proposalId)) {
@@ -276,7 +292,8 @@ router.post("/proposals", async (req, res): Promise<void> => {
   }
 });
 
-// POST /proposals/:id/email
+// ── POST /proposals/:id/email ─────────────────────────────────────────────────
+
 router.post("/proposals/:id/email", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const proposalId = parseInt(raw, 10);
@@ -285,7 +302,10 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
     return;
   }
 
-  const { to, recipientName } = req.body as { to?: string; recipientName?: string };
+  const { to, recipientName } = req.body as {
+    to?: string;
+    recipientName?: string;
+  };
   if (!to || !to.includes("@")) {
     res.status(400).json({ error: "A valid 'to' email address is required" });
     return;
@@ -302,11 +322,38 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
       return;
     }
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+    // Send the email via SendGrid
+    await sendProposalEmail({
+      to,
+      recipientName: recipientName ?? undefined,
+      collegeName: proposal.collegeName,
+      outreachLetter: proposal.outreachLetter ?? "",
+    });
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+    // Append to emailLog so we can track send history
+    const existingLog = parseEmailLog(proposal.emailLog);
+    const newEntry: EmailLogEntry = {
+      sentAt: new Date().toISOString(),
+      to,
+      ...(recipientName ? { recipientName } : {}),
+    };
+    const updatedLog = [...existingLog, newEntry];
 
-    const emailLog = parseEmailLog(proposal.emailLog);
+    await db
+      .update(proposalsTable)
+      .set({ emailLog: updatedLog })
+      .where(eq(proposalsTable.id, proposalId));
+
+    res.json({ success: true, sentAt: newEntry.sentAt });
+  } catch (err) {
+    req.log.error({ err }, "Email proposal failed");
+    res.status(500).json({ error: "Failed to send email" });
+  }
+});
+
+// ── DELETE /proposals/:id ─────────────────────────────────────────────────────
+
+router.delete("/proposals/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
   if (!params.success) {
@@ -333,16 +380,3 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
 });
 
 export default router;
-    const updatedLog = [...existingLog, newEntry];
-function parseEmailLog(raw: unknown): EmailLogEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw as EmailLogEntry[];
-}
-    const lastEntry = emailLog.length > 0 ? emailLog[emailLog.length - 1] : null;
-    const newEntry: EmailLogEntry = {
-      sentAt: new Date().toISOString(),
-      to,
-      ...(recipientName ? { recipientName } : {}),
-    };
-
-    const existingLog = parseEmailLog(proposal.emailLog);
