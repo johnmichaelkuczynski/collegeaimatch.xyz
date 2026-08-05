@@ -403,10 +403,17 @@ export async function generateOutreachLetter(params: {
     })
     .join("\n\n");
 
+  const ZHI_VIRTUES = [
+    "24/7 built-in tutors — every student has on-demand, personalized instruction, eliminating the access gap that stalls most online learning",
+    "Cheat-proof by design — assessments cannot be gamed, so completion actually certifies competence",
+    "Industry-aligned progress — advancement is benchmarked to professional standards, making the credential something employers can trust",
+    "Fixed assessments, adaptive lectures — tests and homework are locked for rigor, while lectures flex in length, depth, and style to fit each learner",
+    "Verified mastery — adaptation never dilutes standards; retention and mastery are confirmed, not assumed",
+  ];
   const virtueList =
     aiVirtues.length > 0
-      ? aiVirtues.join(", ")
-      : "adaptive pacing, embedded diagnostics, built-in tutoring, job-readiness benchmarking";
+      ? aiVirtues.join("; ")
+      : ZHI_VIRTUES.join("; ");
 
   const primaryContact =
     contacts.find((c) => c.decisionPower === "provost") ?? contacts[0];
@@ -445,7 +452,7 @@ ${subset
 AI course features: ${virtueList}
 
 Current annual delivery cost: $${costAnalysis.totalCurrentAnnualCost.toLocaleString()}
-AI install cost: $${costAnalysis.totalAiInstallCost.toLocaleString()}
+AI install cost: $${costAnalysis.totalAiInstallCost.toLocaleString()} (one-time; includes 5 years of guaranteed free maintenance)
 Annual AI license: $${costAnalysis.totalAiAnnualCost.toLocaleString()}
 First-year savings: $${costAnalysis.savingsYear1.toLocaleString()}
 Recurring annual savings: $${costAnalysis.savingsAnnual.toLocaleString()}

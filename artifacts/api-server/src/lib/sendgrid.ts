@@ -59,15 +59,57 @@ function buildRoiTable(
     })
     .join("");
 
-  const totalCurrent = costAnalysis.totalCurrentAnnualCost ?? 0;
-  const totalAi = costAnalysis.totalAiAnnualCost ?? 0;
-  const totalSaves = costAnalysis.savingsAnnual ?? totalCurrent - totalAi;
-  const setupCost = costAnalysis.totalAiInstallCost ?? 0;
+  // Use course-level math so totals always add up (avoids inflated attrition figures)
+  const courseData = courses.filter((c) => c.name).map((c) => ({
+    name: c.name!,
+    current: c.estimatedAnnualCost ?? 0,
+    ai: c.aiAnnualCost ?? 18_000,
+    saves: (c.estimatedAnnualCost ?? 0) - (c.aiAnnualCost ?? 18_000),
+  }));
+  const totalCurrent = courseData.reduce((s, c) => s + c.current, 0);
+  const totalAi      = courseData.reduce((s, c) => s + c.ai, 0);
+  const totalSaves   = totalCurrent - totalAi;
+  const setupCost    = costAnalysis.totalAiInstallCost ?? 0;
+  const maxSaves     = Math.max(...courseData.map((c) => c.saves), 1);
+
+  // ── HTML bar helper ──────────────────────────────────────────────────────────
+  const bar = (value: number, max: number, color: string) => {
+    const pct = Math.round((value / max) * 100);
+    return `<table width="100%" cellpadding="0" cellspacing="0" style="height:20px;">
+      <tr>
+        <td width="${pct}%" style="background:${color};border-radius:3px;height:16px;"></td>
+        <td width="${100 - pct}%"></td>
+      </tr>
+    </table>`;
+  };
+
+  // ── Comparison chart rows ────────────────────────────────────────────────────
+  const comparisonRows = `
+    <tr>
+      <td style="padding:6px 12px 2px;font-size:12px;color:#374151;white-space:nowrap;width:110px;">Current Costs</td>
+      <td style="padding:6px 12px 2px;">${bar(totalCurrent, totalCurrent, "#dc2626")}</td>
+      <td style="padding:6px 12px 2px;font-size:12px;font-family:monospace;color:#dc2626;white-space:nowrap;text-align:right;">${fmt(totalCurrent)}</td>
+    </tr>
+    <tr>
+      <td style="padding:2px 12px 6px;font-size:12px;color:#374151;">With AI</td>
+      <td style="padding:2px 12px 6px;">${bar(totalAi, totalCurrent, "#16a34a")}</td>
+      <td style="padding:2px 12px 6px;font-size:12px;font-family:monospace;color:#16a34a;text-align:right;">${fmt(totalAi)}</td>
+    </tr>`;
+
+  // ── Per-course savings bar rows ──────────────────────────────────────────────
+  const savingsBarRows = courseData.map((c) => `
+    <tr>
+      <td style="padding:3px 12px;font-size:11px;color:#374151;white-space:nowrap;width:160px;">${c.name.length > 22 ? c.name.slice(0, 20) + "…" : c.name}</td>
+      <td style="padding:3px 12px;">${bar(c.saves, maxSaves, "#16a34a")}</td>
+      <td style="padding:3px 12px;font-size:11px;font-family:monospace;font-weight:700;color:#16a34a;white-space:nowrap;text-align:right;">${fmt(c.saves)}</td>
+    </tr>`).join("");
 
   return `
   <!-- ROI Analysis -->
   <table width="100%" cellpadding="0" cellspacing="0"
     style="border:1px solid #e5e7eb;border-radius:8px;margin:32px 0;overflow:hidden;font-family:sans-serif;">
+
+    <!-- Header -->
     <tr>
       <td colspan="5" style="background:#f9fafb;padding:14px 16px;border-bottom:1px solid #e5e7eb;">
         <span style="font-size:13px;font-weight:700;color:#374151;letter-spacing:0.03em;">
@@ -75,6 +117,7 @@ function buildRoiTable(
         </span>
       </td>
     </tr>
+
     <!-- Summary tiles -->
     <tr>
       <td colspan="2" style="padding:16px;background:#fff7f7;text-align:center;border-right:1px solid #e5e7eb;">
@@ -84,13 +127,34 @@ function buildRoiTable(
       <td colspan="1" style="padding:16px;background:#ffffff;text-align:center;border-right:1px solid #e5e7eb;">
         <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">Zhi AI Annual License</div>
         <div style="font-size:20px;font-weight:700;color:#1f2937;font-family:monospace;">${fmt(totalAi)}</div>
-        ${setupCost ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;">+ ${fmt(setupCost)} one-time setup</div>` : ""}
+        ${setupCost ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;">+ ${fmt(setupCost)} one-time setup</div><div style="font-size:10px;color:#16a34a;margin-top:2px;font-weight:600;">incl. 5 yrs free maintenance</div>` : ""}
       </td>
       <td colspan="2" style="padding:16px;background:#f0fdf4;text-align:center;">
         <div style="font-size:11px;color:#6b7280;margin-bottom:4px;">Annual Savings</div>
         <div style="font-size:20px;font-weight:700;color:#16a34a;font-family:monospace;">${fmt(totalSaves)}</div>
       </td>
     </tr>
+
+    <!-- Comparison bar chart -->
+    <tr>
+      <td colspan="5" style="padding:16px 0 8px;border-top:1px solid #e5e7eb;">
+        <div style="padding:0 12px;font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">
+          Current Burden vs. AI Integration
+        </div>
+        <table width="100%" cellpadding="0" cellspacing="0">${comparisonRows}</table>
+      </td>
+    </tr>
+
+    <!-- Per-course savings bars -->
+    <tr>
+      <td colspan="5" style="padding:8px 0 16px;border-top:1px solid #f3f4f6;">
+        <div style="padding:0 12px;font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">
+          Annual Savings per Course
+        </div>
+        <table width="100%" cellpadding="0" cellspacing="0">${savingsBarRows}</table>
+      </td>
+    </tr>
+
     <!-- Table header -->
     <tr style="background:#f3f4f6;border-top:1px solid #e5e7eb;">
       <td style="padding:8px 12px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Course</td>
@@ -131,11 +195,46 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
     .join("\n");
 
   // Build ROI table if course data is available
-  const hasCourseData =
-    courses && courses.length > 0 && costAnalysis;
-  const roiTableHtml = hasCourseData
-    ? buildRoiTable(courses, costAnalysis)
-    : "";
+  const hasCourseData = courses && courses.length > 0 && costAnalysis;
+  const roiTableHtml = hasCourseData ? buildRoiTable(courses, costAnalysis) : "";
+
+  // Zhi Systems feature showcase — always included
+  const virtues = [
+    { icon: "🕐", title: "24/7 Built-In Tutors", body: "Every student has on-demand, personalized instruction — eliminating the access gap that stalls most online learning." },
+    { icon: "🔒", title: "Cheat-Proof by Design", body: "Assessments cannot be gamed, so course completion actually certifies competence employers can rely on." },
+    { icon: "📈", title: "Industry-Aligned Progress", body: "Advancement is benchmarked to professional standards, making the credential something hiring managers trust." },
+    { icon: "🎯", title: "Fixed Assessments, Adaptive Lectures", body: "Tests and homework stay locked for rigor, while lectures flex in length, depth, and style to fit each learner." },
+    { icon: "✅", title: "Verified Mastery", body: "Adaptation never dilutes standards — retention and mastery are confirmed, not assumed." },
+    { icon: "🛡️", title: "5-Year Free Maintenance Guarantee", body: "The one-time setup fee locks in five full years of platform maintenance at no additional cost — zero budget surprises." },
+  ];
+  const virtueCards = virtues.map((v) => `
+    <tr>
+      <td width="40" style="padding:12px 8px 12px 16px;vertical-align:top;font-size:22px;">${v.icon}</td>
+      <td style="padding:12px 16px 12px 0;vertical-align:top;border-bottom:1px solid #e5e7eb;">
+        <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:3px;">${v.title}</div>
+        <div style="font-size:13px;color:#4b5563;line-height:1.5;">${v.body}</div>
+      </td>
+    </tr>`).join("");
+
+  const virtuesHtml = `
+  <table width="100%" cellpadding="0" cellspacing="0"
+    style="border:1px solid #e5e7eb;border-radius:8px;margin:32px 0;overflow:hidden;font-family:sans-serif;">
+    <tr>
+      <td colspan="2" style="background:#111827;padding:14px 16px;">
+        <span style="font-size:13px;font-weight:700;color:#ffffff;letter-spacing:0.03em;">
+          ✦ WHY ZHI SYSTEMS — WHAT MAKES THIS DIFFERENT
+        </span>
+      </td>
+    </tr>
+    ${virtueCards}
+    <tr>
+      <td colspan="2" style="padding:12px 16px;background:#f9fafb;text-align:center;">
+        <a href="https://zhisystems.ai/" style="font-size:13px;color:#4f46e5;font-weight:600;text-decoration:none;">
+          Learn more at zhisystems.ai →
+        </a>
+      </td>
+    </tr>
+  </table>`;
 
   const html = `
 <!DOCTYPE html>
@@ -155,6 +254,7 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
     <tr>
       <td style="background:#ffffff;padding:40px 32px;border-radius:0 0 8px 8px;">
         ${bodyHtml}
+        ${virtuesHtml}
         ${roiTableHtml}
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0;"/>
         <p style="margin:0;font-family:sans-serif;font-size:12px;color:#9ca3af;">

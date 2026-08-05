@@ -433,10 +433,13 @@ export default function ProposalDetail() {
           savings: ((c as any).estimatedAnnualCost ?? 0) - (c.aiAnnualCost ?? 18_000),
           failRate: (c as any).failRate,
         }))
+        const totalCourseCurrent = perCourse.reduce((s, c) => s + c.current, 0)
+        const totalCourseAi      = perCourse.reduce((s, c) => s + c.ai, 0)
+        const totalCourseSavings = totalCourseCurrent - totalCourseAi
 
         const comparisonData = [
-          { name: "Current Costs", value: costAnalysis.totalCurrentAnnualCost },
-          { name: "With AI", value: costAnalysis.totalAiAnnualCost },
+          { name: "Current Costs", value: totalCourseCurrent },
+          { name: "With AI", value: totalCourseAi },
         ]
 
         return (
@@ -448,20 +451,20 @@ export default function ProposalDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
-              {/* Summary tiles */}
+              {/* Summary tiles — all derived from per-course sums for consistency */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-lg border bg-destructive/5 p-3 text-center">
                   <div className="text-xs text-muted-foreground mb-1">Current Annual Cost</div>
-                  <div className="text-base font-mono font-bold text-destructive">{formatCurrency(costAnalysis.totalCurrentAnnualCost)}</div>
+                  <div className="text-base font-mono font-bold text-destructive">{formatCurrency(totalCourseCurrent)}</div>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-3 text-center">
                   <div className="text-xs text-muted-foreground mb-1">Zhi AI Annual License</div>
-                  <div className="text-base font-mono font-bold">{formatCurrency(costAnalysis.totalAiAnnualCost)}</div>
+                  <div className="text-base font-mono font-bold">{formatCurrency(totalCourseAi)}</div>
                   <div className="text-[10px] text-muted-foreground mt-0.5">+ {formatCurrency(costAnalysis.totalAiInstallCost)} setup</div>
                 </div>
                 <div className="rounded-lg border bg-emerald-500/10 border-emerald-500/30 p-3 text-center">
                   <div className="text-xs text-muted-foreground mb-1">Annual Savings</div>
-                  <div className="text-base font-mono font-bold text-emerald-600">{formatCurrency(costAnalysis.savingsAnnual)}</div>
+                  <div className="text-base font-mono font-bold text-emerald-600">{formatCurrency(totalCourseSavings)}</div>
                 </div>
               </div>
 
@@ -533,9 +536,9 @@ export default function ProposalDetail() {
                     ))}
                     <tr className="border-t bg-emerald-50/50 dark:bg-emerald-950/20 font-semibold">
                       <td className="px-3 py-2" colSpan={2}>Total</td>
-                      <td className="px-3 py-2 text-right font-mono">{formatCurrency(costAnalysis.totalCurrentAnnualCost)}</td>
-                      <td className="px-3 py-2 text-right font-mono text-emerald-600">{formatCurrency(costAnalysis.totalAiAnnualCost)}</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(costAnalysis.savingsAnnual)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{formatCurrency(totalCourseCurrent)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-emerald-600">{formatCurrency(totalCourseAi)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600">{formatCurrency(totalCourseSavings)}</td>
                     </tr>
                   </tbody>
                 </table>
