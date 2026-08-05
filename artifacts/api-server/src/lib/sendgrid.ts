@@ -147,6 +147,9 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
       <td style="background:#111827;padding:24px 32px;border-radius:8px 8px 0 0;">
         <p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Zhi Systems</p>
         <p style="margin:4px 0 0;color:#9ca3af;font-size:13px;">AI-Powered Courseware for Higher Education</p>
+        <p style="margin:8px 0 0;">
+          <a href="https://zhisystems.ai/" style="color:#818cf8;font-size:13px;text-decoration:none;letter-spacing:0.02em;">zhisystems.ai</a>
+        </p>
       </td>
     </tr>
     <tr>
