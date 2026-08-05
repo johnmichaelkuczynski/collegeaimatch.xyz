@@ -2,7 +2,7 @@ import * as React from "react"
 import { useParams, Link } from "wouter"
 import {
   ArrowLeft, Download, Send, Copy, FileText, CheckCircle2,
-  Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye, Clock
+  Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye, Clock, AlertTriangle
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
 import { pdf } from "@react-pdf/renderer"
@@ -26,6 +26,7 @@ const REP_EMAIL_KEY = "zhi_rep_email"
 // ── Email dialog ──────────────────────────────────────────────────────────────
 
 interface Contact { name?: string; title?: string; email?: string }
+interface EmailLogEntry { sentAt: string; to: string; recipientName?: string }
 type SendState = "idle" | "sending" | "success" | "error"
 
 interface EmailDialogProps {
@@ -34,24 +35,28 @@ interface EmailDialogProps {
   proposalId: number
   collegeName: string
   contacts: Contact[]
+  /** Past sends for this proposal — used to warn about duplicates */
+  emailLog?: EmailLogEntry[]
   /** When true the dialog is pre-filled with the rep's own address */
   previewMode?: boolean
   /** Called when an email is successfully sent */
   onSent?: (sentAt: string, to: string) => void
 }
 
-function EmailDialog({ open, onClose, proposalId, collegeName, contacts, previewMode, onSent }: EmailDialogProps) {
+function EmailDialog({ open, onClose, proposalId, collegeName, contacts, emailLog, previewMode, onSent }: EmailDialogProps) {
   const savedRepEmail = () => localStorage.getItem(REP_EMAIL_KEY) ?? ""
 
   const [to, setTo] = React.useState("")
   const [recipientName, setRecipientName] = React.useState("")
   const [sendState, setSendState] = React.useState<SendState>("idle")
   const [errorMsg, setErrorMsg] = React.useState("")
+  const [warnDismissed, setWarnDismissed] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) return
     setSendState("idle")
     setErrorMsg("")
+    setWarnDismissed(false)
     if (previewMode) {
       setTo(savedRepEmail())
       setRecipientName("")
@@ -60,6 +65,15 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts, preview
       setRecipientName("")
     }
   }, [open, previewMode])
+
+  // Reset warning dismissal whenever the `to` address changes
+  React.useEffect(() => { setWarnDismissed(false) }, [to])
+
+  const priorSend = React.useMemo(() => {
+    const addr = to.trim().toLowerCase()
+    if (!addr || !emailLog?.length) return null
+    return emailLog.find((e) => e.to.trim().toLowerCase() === addr) ?? null
+  }, [to, emailLog])
 
   function selectContact(c: Contact) {
     setTo(c.email ?? "")
@@ -186,6 +200,25 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts, preview
                 </div>
               )}
             </div>
+
+            {/* Duplicate-send warning */}
+            {priorSend && !warnDismissed && (
+              <div className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200 text-sm px-3 py-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="flex-1">
+                  You sent this proposal to <span className="font-mono">{priorSend.to}</span> on{" "}
+                  {new Date(priorSend.sentAt).toLocaleDateString()}. Send again?
+                </span>
+                <button
+                  type="button"
+                  aria-label="Dismiss warning"
+                  onClick={() => setWarnDismissed(true)}
+                  className="shrink-0 hover:opacity-70"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
             {errorMsg && (
               <div className="flex items-center gap-2 rounded-md bg-destructive/10 text-destructive text-sm px-3 py-2">
@@ -335,6 +368,7 @@ export default function ProposalDetail() {
         proposalId={id}
         collegeName={proposal.collegeName}
         contacts={(contacts ?? []) as Contact[]}
+        emailLog={((proposal as any).emailLog ?? []) as EmailLogEntry[]}
         previewMode
         onSent={handleEmailSent}
       />
@@ -344,6 +378,7 @@ export default function ProposalDetail() {
         proposalId={id}
         collegeName={proposal.collegeName}
         contacts={(contacts ?? []) as Contact[]}
+        emailLog={((proposal as any).emailLog ?? []) as EmailLogEntry[]}
         onSent={handleEmailSent}
       />
 
