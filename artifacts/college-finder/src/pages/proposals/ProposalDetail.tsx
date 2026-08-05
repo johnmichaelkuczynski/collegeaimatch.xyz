@@ -5,7 +5,7 @@ import {
   Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye, Clock, AlertTriangle
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
-import { pdf } from "@react-pdf/renderer"
+import { pdf, PDFViewer } from "@react-pdf/renderer"
 
 import { useGetProposal, getGetProposalQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
@@ -254,6 +254,7 @@ export default function ProposalDetail() {
   const queryClient = useQueryClient()
 
   const [pdfLoading, setPdfLoading] = React.useState(false)
+  const [pdfPreviewOpen, setPdfPreviewOpen] = React.useState(false)
   const [emailOpen, setEmailOpen] = React.useState(false)
   const [previewEmailOpen, setPreviewEmailOpen] = React.useState(false)
 
@@ -361,6 +362,28 @@ export default function ProposalDetail() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-12">
+      {/* PDF Preview Dialog */}
+      <Dialog open={pdfPreviewOpen} onOpenChange={(v) => !v && setPdfPreviewOpen(false)}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              PDF Preview — {proposal?.collegeName}
+            </DialogTitle>
+            <DialogDescription>
+              Review how the proposal will look before downloading or sending.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {pdfPreviewOpen && proposal && (
+              <PDFViewer width="100%" height="100%" style={{ border: "none" }}>
+                <ProposalPDF proposal={proposal} />
+              </PDFViewer>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Email dialogs */}
       <EmailDialog
         open={previewEmailOpen}
@@ -413,6 +436,9 @@ export default function ProposalDetail() {
             {pdfLoading
               ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
               : <><Download className="mr-2 h-4 w-4" />Download PDF</>}
+          </Button>
+          <Button variant="outline" onClick={() => setPdfPreviewOpen(true)}>
+            <FileText className="mr-2 h-4 w-4" />Preview PDF
           </Button>
           <Button variant="outline" onClick={() => setPreviewEmailOpen(true)}>
             <Eye className="mr-2 h-4 w-4" />Preview (send to myself)
