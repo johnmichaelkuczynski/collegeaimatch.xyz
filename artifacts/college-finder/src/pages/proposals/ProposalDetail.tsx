@@ -537,6 +537,42 @@ export default function ProposalDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Email History */}
+          {(() => {
+            const log = ((proposal as any).emailLog ?? []) as Array<{ sentAt: string; to: string; recipientName?: string }>
+            if (log.length === 0) return null
+            const sorted = [...log].sort(
+              (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+            )
+            return (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Email History
+                    <Badge variant="secondary">{log.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-4 pb-4">
+                  {sorted.map((entry, i) => (
+                    <div key={i} className="flex flex-col gap-0.5 bg-background border rounded-md p-3 text-sm">
+                      {entry.recipientName
+                        ? <div className="font-medium">{entry.recipientName}</div>
+                        : <div className="text-muted-foreground italic text-xs">No name recorded</div>
+                      }
+                      <div className="font-mono text-xs text-primary">{entry.to}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(entry.sentAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                        {" at "}
+                        {new Date(entry.sentAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )
+          })()}
         </div>
       </div>
     </div>
