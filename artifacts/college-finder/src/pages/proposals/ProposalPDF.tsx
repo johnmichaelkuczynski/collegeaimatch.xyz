@@ -266,29 +266,42 @@ export function ProposalPDF({ proposal }: { proposal: ProposalData }) {
         </View>
         <View style={s.divider} />
 
-        {/* Target Courses */}
-        <Text style={s.sectionHeading}>Target Courses</Text>
-        {courses && courses.length > 0 ? (
-          <View style={{ marginBottom: 20 }}>
-            {/* Table header */}
-            <View style={s.tableHeader}>
-              <Text style={[s.tableHeaderText, { flex: 3 }]}>Course</Text>
-              <Text style={[s.tableHeaderText, { flex: 1 }]}>Subject</Text>
-              <Text style={[s.tableHeaderText, { width: 60, textAlign: "right" }]}>Enrollment</Text>
-              <Text style={s.tableHeaderTextRight}>AI Cost/yr</Text>
-              <Text style={s.tableHeaderTextRight}>Current/yr</Text>
-            </View>
-            {courses.map((c, i) => (
-              <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-                <Text style={[s.tableCell, { flex: 3 }]}>{c.name}</Text>
-                <Text style={[s.tableCell, { flex: 1, color: brand.muted, fontSize: 8 }]}>{c.subject ?? "—"}</Text>
-                <Text style={[s.tableCell, { width: 60, textAlign: "right", fontSize: 8 }]}>{c.estimatedEnrollment ?? "—"}</Text>
-                <Text style={s.tableCellRight}>{usd(c.aiAnnualCost)}</Text>
-                <Text style={[s.tableCellRight, { color: brand.danger }]}>{usd(c.estimatedAnnualCost)}</Text>
+        {/* ROI Analysis — per-course savings table */}
+        <Text style={s.sectionHeading}>ROI Analysis</Text>
+        {courses && courses.length > 0 ? (() => {
+          const totalCurrent = courses.reduce((sum, c) => sum + (c.estimatedAnnualCost ?? 0), 0)
+          const totalAi = courses.reduce((sum, c) => sum + (c.aiAnnualCost ?? 0), 0)
+          const totalSavings = totalCurrent - totalAi
+          return (
+            <View style={{ marginBottom: 20 }}>
+              {/* Table header */}
+              <View style={s.tableHeader}>
+                <Text style={[s.tableHeaderText, { flex: 3 }]}>Course</Text>
+                <Text style={s.tableHeaderTextRight}>Current/yr</Text>
+                <Text style={s.tableHeaderTextRight}>AI/yr</Text>
+                <Text style={s.tableHeaderTextRight}>Saves/yr</Text>
               </View>
-            ))}
-          </View>
-        ) : (
+              {courses.map((c, i) => {
+                const saves = (c.estimatedAnnualCost ?? 0) - (c.aiAnnualCost ?? 0)
+                return (
+                  <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                    <Text style={[s.tableCell, { flex: 3 }]}>{c.name}</Text>
+                    <Text style={[s.tableCellRight, { color: brand.danger }]}>{usd(c.estimatedAnnualCost)}</Text>
+                    <Text style={[s.tableCellRight, { color: brand.primary }]}>{usd(c.aiAnnualCost)}</Text>
+                    <Text style={s.tableCellRight}>{usd(saves > 0 ? saves : 0)}</Text>
+                  </View>
+                )
+              })}
+              {/* Total row */}
+              <View style={{ flexDirection: "row", padding: "6 8", backgroundColor: brand.primary, borderRadius: "0 0 4 4" }}>
+                <Text style={[s.tableHeaderText, { flex: 3 }]}>Total</Text>
+                <Text style={s.tableHeaderTextRight}>{usd(totalCurrent)}</Text>
+                <Text style={s.tableHeaderTextRight}>{usd(totalAi)}</Text>
+                <Text style={[s.tableHeaderTextRight, { color: "#6ee7b7" }]}>{usd(totalSavings > 0 ? totalSavings : 0)}</Text>
+              </View>
+            </View>
+          )
+        })() : (
           <Text style={{ color: brand.muted, fontSize: 9, marginBottom: 20 }}>No courses included in this proposal.</Text>
         )}
 
