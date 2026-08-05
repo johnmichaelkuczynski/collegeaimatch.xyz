@@ -123,7 +123,7 @@ export default function CollegeDetail() {
   }
 
   const handleSaveScratch = () => {
-    if (!college || !scratchLetter.trim()) return
+    if (!college || !scratchLetter.trim() || !costAnalysis) return
     setScratchSaving(true)
     saveProposal.mutate(
       {

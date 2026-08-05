@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "wouter"
-import { FileText, Plus, ExternalLink, Calendar, Building, DollarSign } from "lucide-react"
+import { FileText, Plus, ExternalLink, Calendar, Building, Mail } from "lucide-react"
 
 import { useListProposals } from "@workspace/api-client-react"
 import { cn } from "@/lib/utils"
@@ -52,6 +52,7 @@ export default function ProposalsList() {
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Courses Targeted</TableHead>
                 <TableHead>Generated On</TableHead>
+                <TableHead>Last Emailed</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -75,6 +76,18 @@ export default function ProposalsList() {
                       <Calendar className="h-4 w-4" />
                       {new Date(proposal.createdAt).toLocaleDateString()}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {(proposal as any).lastEmailedAt ? (
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="secondary" className="gap-1 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                          <Mail className="h-3 w-3" />
+                          {new Date((proposal as any).lastEmailedAt).toLocaleDateString()}
+                        </Badge>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not sent</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Link href={`/proposals/${proposal.id}`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "font-semibold text-primary")}>

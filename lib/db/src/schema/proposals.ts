@@ -10,6 +10,7 @@ export const proposalsTable = pgTable("proposals", {
   aiVirtues: jsonb("ai_virtues").default([]),
   outreachLetter: text("outreach_letter").notNull(),
   costAnalysis: jsonb("cost_analysis").notNull(),
+  emailLog: jsonb("email_log").default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

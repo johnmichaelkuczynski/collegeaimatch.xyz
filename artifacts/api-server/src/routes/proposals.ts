@@ -22,29 +22,40 @@ import { sendProposalEmail } from "../lib/sendgrid";
 
 const router: IRouter = Router();
 
-// GET /proposals
-router.get("/proposals", async (_req, res): Promise<void> => {
-  try {
+// ── Email-log helpers ─────────────────────────────────────────────────────────
+
+interface EmailLogEntry {
+  sentAt: string;
+  to: string;
+  recipientName?: string;
+}
     const proposals = await db
       .select({
         id: proposalsTable.id,
         collegeName: proposalsTable.collegeName,
         collegeState: proposalsTable.collegeState,
         courses: proposalsTable.courses,
+        emailLog: proposalsTable.emailLog,
         createdAt: proposalsTable.createdAt,
         updatedAt: proposalsTable.updatedAt,
       })
       .from(proposalsTable)
       .orderBy(desc(proposalsTable.createdAt));
 
-    const summaries = proposals.map((p) => ({
-      id: p.id,
-      collegeName: p.collegeName,
-      collegeState: p.collegeState,
-      courseCount: Array.isArray(p.courses) ? p.courses.length : 0,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    }));
+    const summaries = proposals.map((p) => {
+      const log = parseEmailLog(p.emailLog);
+      const lastEntry = log.length > 0 ? log[log.length - 1] : null;
+      return {
+        id: p.id,
+        collegeName: p.collegeName,
+        collegeState: p.collegeState,
+        courseCount: Array.isArray(p.courses) ? p.courses.length : 0,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+        lastEmailedAt: lastEntry ? lastEntry.sentAt : null,
+        lastEmailedTo: lastEntry ? lastEntry.to : null,
+      };
+    });
 
     res.json(summaries);
   } catch (err) {
@@ -55,7 +66,7 @@ router.get("/proposals", async (_req, res): Promise<void> => {
 
 // POST /proposals/generate — must be BEFORE /:id to avoid param capture
 router.post("/proposals/generate", async (req, res): Promise<void> => {
-  const parsed = GenerateProposalBody.safeParse(req.body);
+  const parsed = CreateProposalBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
@@ -66,7 +77,10 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
   const rawBody = req.body as Record<string, unknown>;
   const pitchMode = rawBody.pitchMode === true;
   const collegeCity = typeof rawBody.collegeCity === "string" ? rawBody.collegeCity : "";
-  const tone = typeof rawBody.tone === "string" ? rawBody.tone as import("../lib/aiClient").OutreachTone : "formal";
+  const tone =
+    typeof rawBody.tone === "string"
+      ? (rawBody.tone as import("../lib/aiClient").OutreachTone)
+      : "formal";
   const subset = rawBody.subset === true;
 
   try {
@@ -89,7 +103,18 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
     // ── Single-course pitch path ─────────────────────────────────────────────
     if (pitchMode && courses.length === 1) {
       const course = courses[0];
-      const outreachLetter = await generateSingleCoursePitch(collegeInfo, course);
+    const outreachLetter = await generateOutreachLetter({
+      college: collegeInfo,
+      courses,
+      contacts: contacts.map((c) => ({
+        ...c,
+        institution: input.collegeName,
+      })),
+      aiVirtues: input.aiVirtues ?? [],
+      costAnalysis,
+      tone,
+      subset,
+    });
 
       // Build a CostAnalysisData-shaped object from the pitch formula numbers
       const nums = computeSingleCoursePitchNumbers(course, collegeInfo.type);
@@ -182,42 +207,22 @@ router.post("/proposals", async (req, res): Promise<void> => {
 
   try {
     const [proposal] = await db
-      .insert(proposalsTable)
-      .values({
-        collegeId: input.collegeId ?? null,
-        collegeName: input.collegeName,
-        collegeState: input.collegeState,
-        courses: input.courses ?? [],
-        contacts: input.contacts ?? [],
-        aiVirtues: input.aiVirtues ?? [],
-        outreachLetter: input.outreachLetter,
-        costAnalysis: input.costAnalysis ?? {},
-      })
-      .returning();
+      .select()
+      .from(proposalsTable)
+      .where(eq(proposalsTable.id, proposalId));
 
-    res.status(201).json({
-      id: proposal.id,
-      collegeId: proposal.collegeId,
-      collegeName: proposal.collegeName,
-      collegeState: proposal.collegeState,
-      courses: proposal.courses ?? [],
-      contacts: proposal.contacts ?? [],
-      aiVirtues: proposal.aiVirtues ?? [],
-      outreachLetter: proposal.outreachLetter,
-      costAnalysis: proposal.costAnalysis,
-      createdAt: proposal.createdAt.toISOString(),
-      updatedAt: proposal.updatedAt.toISOString(),
-    });
-  } catch (err) {
-    req.log.error({ err }, "Create proposal failed");
-    res.status(500).json({ error: "Failed to create proposal" });
-  }
-});
+    if (!proposal) {
+      res.status(404).json({ error: "Proposal not found" });
+      return;
+    }
 
-// GET /proposals/:id
-router.get("/proposals/:id", async (req, res): Promise<void> => {
+    const emailLog = parseEmailLog(proposal.emailLog);
+
+    const emailLog = parseEmailLog(proposal.emailLog);
+
+    const emailLog = parseEmailLog(proposal.emailLog);
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
+  const params = DeleteProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -227,34 +232,18 @@ router.get("/proposals/:id", async (req, res): Promise<void> => {
     const [proposal] = await db
       .select()
       .from(proposalsTable)
-      .where(eq(proposalsTable.id, params.data.proposalId));
+      .where(eq(proposalsTable.id, proposalId));
 
     if (!proposal) {
       res.status(404).json({ error: "Proposal not found" });
       return;
     }
 
-    res.json({
-      id: proposal.id,
-      collegeId: proposal.collegeId,
-      collegeName: proposal.collegeName,
-      collegeState: proposal.collegeState,
-      courses: proposal.courses ?? [],
-      contacts: proposal.contacts ?? [],
-      aiVirtues: proposal.aiVirtues ?? [],
-      outreachLetter: proposal.outreachLetter,
-      costAnalysis: proposal.costAnalysis,
-      createdAt: proposal.createdAt.toISOString(),
-      updatedAt: proposal.updatedAt.toISOString(),
-    });
-  } catch (err) {
-    req.log.error({ err }, "Get proposal failed");
-    res.status(500).json({ error: "Failed to get proposal" });
-  }
-});
+    const emailLog = parseEmailLog(proposal.emailLog);
 
-// PATCH /proposals/:id — update outreach letter text
-router.patch("/proposals/:id", async (req, res): Promise<void> => {
+    const emailLog = parseEmailLog(proposal.emailLog);
+
+    const emailLog = parseEmailLog(proposal.emailLog);
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const proposalId = parseInt(raw, 10);
   if (isNaN(proposalId)) {
@@ -313,28 +302,11 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
       return;
     }
 
-    if (!proposal.outreachLetter) {
-      res.status(400).json({ error: "This proposal has no letter to send" });
-      return;
-    }
+    const emailLog = parseEmailLog(proposal.emailLog);
 
-    await sendProposalEmail({
-      to,
-      recipientName,
-      collegeName: proposal.collegeName,
-      outreachLetter: proposal.outreachLetter,
-      proposalId,
-    });
+    const emailLog = parseEmailLog(proposal.emailLog);
 
-    res.json({ success: true, to });
-  } catch (err) {
-    req.log.error({ err }, "Send proposal email failed");
-    res.status(500).json({ error: "Failed to send email" });
-  }
-});
-
-// DELETE /proposals/:id
-router.delete("/proposals/:id", async (req, res): Promise<void> => {
+    const emailLog = parseEmailLog(proposal.emailLog);
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
   if (!params.success) {
@@ -361,3 +333,16 @@ router.delete("/proposals/:id", async (req, res): Promise<void> => {
 });
 
 export default router;
+    const updatedLog = [...existingLog, newEntry];
+function parseEmailLog(raw: unknown): EmailLogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw as EmailLogEntry[];
+}
+    const lastEntry = emailLog.length > 0 ? emailLog[emailLog.length - 1] : null;
+    const newEntry: EmailLogEntry = {
+      sentAt: new Date().toISOString(),
+      to,
+      ...(recipientName ? { recipientName } : {}),
+    };
+
+    const existingLog = parseEmailLog(proposal.emailLog);

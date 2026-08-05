@@ -2,7 +2,7 @@ import * as React from "react"
 import { useParams, Link } from "wouter"
 import {
   ArrowLeft, Download, Send, Copy, FileText, CheckCircle2,
-  Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye
+  Building, Loader2, Mail, User, AtSign, Pencil, X, Save, Eye, Clock
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts"
 import { pdf } from "@react-pdf/renderer"
@@ -36,9 +36,11 @@ interface EmailDialogProps {
   contacts: Contact[]
   /** When true the dialog is pre-filled with the rep's own address */
   previewMode?: boolean
+  /** Called when an email is successfully sent */
+  onSent?: (sentAt: string, to: string) => void
 }
 
-function EmailDialog({ open, onClose, proposalId, collegeName, contacts, previewMode }: EmailDialogProps) {
+function EmailDialog({ open, onClose, proposalId, collegeName, contacts, previewMode, onSent }: EmailDialogProps) {
   const savedRepEmail = () => localStorage.getItem(REP_EMAIL_KEY) ?? ""
 
   const [to, setTo] = React.useState("")
@@ -84,7 +86,9 @@ function EmailDialog({ open, onClose, proposalId, collegeName, contacts, preview
         const body = await res.json().catch(() => ({}))
         throw new Error((body as { error?: string }).error ?? "Send failed")
       }
+      const body = await res.json().catch(() => ({}))
       setSendState("success")
+      if (onSent) onSent((body as { sentAt?: string }).sentAt ?? new Date().toISOString(), dest)
     } catch (err) {
       setSendState("sending" === sendState ? "error" : "error")
       setSendState("error")
@@ -220,6 +224,9 @@ export default function ProposalDetail() {
   const [emailOpen, setEmailOpen] = React.useState(false)
   const [previewEmailOpen, setPreviewEmailOpen] = React.useState(false)
 
+  // Track last-sent info for optimistic badge display
+  const [lastSent, setLastSent] = React.useState<{ sentAt: string; to: string } | null>(null)
+
   // Letter editing
   const [editMode, setEditMode] = React.useState(false)
   const [editedLetter, setEditedLetter] = React.useState("")
@@ -239,6 +246,12 @@ export default function ProposalDetail() {
       setEditMode(true)
     }
   }, [proposal])
+
+  function handleEmailSent(sentAt: string, to: string) {
+    setLastSent({ sentAt, to })
+    // Invalidate query so the email_log is refreshed from server
+    queryClient.invalidateQueries({ queryKey: getGetProposalQueryKey(id) })
+  }
 
   function startEdit() {
     setEditedLetter(proposal?.outreachLetter ?? "")
@@ -323,6 +336,7 @@ export default function ProposalDetail() {
         collegeName={proposal.collegeName}
         contacts={(contacts ?? []) as Contact[]}
         previewMode
+        onSent={handleEmailSent}
       />
       <EmailDialog
         open={emailOpen}
@@ -330,6 +344,7 @@ export default function ProposalDetail() {
         proposalId={id}
         collegeName={proposal.collegeName}
         contacts={(contacts ?? []) as Contact[]}
+        onSent={handleEmailSent}
       />
 
       {/* Header */}
@@ -340,9 +355,22 @@ export default function ProposalDetail() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Proposal: {proposal.collegeName}</h1>
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <Building className="h-4 w-4" /> {proposal.collegeState} • Generated {new Date(proposal.createdAt).toLocaleDateString()}
-            </p>
+            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Building className="h-4 w-4" /> {proposal.collegeState} • Generated {new Date(proposal.createdAt).toLocaleDateString()}
+              </p>
+              {(() => {
+                const sentAt = lastSent?.sentAt ?? (proposal as any).lastEmailedAt ?? null
+                const sentTo = lastSent?.to ?? (proposal as any).lastEmailedTo ?? null
+                return sentAt ? (
+                  <Badge className="gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                    <Clock className="h-3 w-3" />
+                    Last emailed {new Date(sentAt).toLocaleDateString()}
+                    {sentTo ? ` · ${sentTo}` : ""}
+                  </Badge>
+                ) : null
+              })()}
+            </div>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
