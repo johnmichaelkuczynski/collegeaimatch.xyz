@@ -118,7 +118,28 @@ function parseCSVLine(line: string): string[] {
 
 // ── Main ───────────────────────────────────────────────────────────────────
 
+/**
+ * Exported for use by the API server: seeds colleges on first boot if the
+ * table is empty. Returns the number of colleges inserted (0 if already seeded).
+ */
+export async function seedCollegesIfEmpty(): Promise<number> {
+  const { sql } = await import("drizzle-orm");
+  const rows = await db.execute(sql`SELECT COUNT(*)::int AS n FROM colleges`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const count = (rows as any).rows?.[0]?.n ?? (rows as any)[0]?.n ?? 0;
+  if (Number(count) > 0) {
+    console.log(`ℹ️  Colleges already seeded (${count} rows). Skipping.`);
+    return 0;
+  }
+  return seedImpl();
+}
+
 async function seed() {
+  const inserted = await seedImpl();
+  process.exit(inserted >= 0 ? 0 : 1);
+}
+
+async function seedImpl(): Promise<number> {
   console.log("📦  Seeding colleges from IPEDS HD2023…");
 
   // 1. Download
@@ -253,10 +274,13 @@ async function seed() {
     rmSync(TMP, { recursive: true });
   } catch {}
 
-  process.exit(0);
+  return inserted;
 }
 
-seed().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
+// Only run as a CLI script (not when imported as a module)
+if (process.argv[1]?.endsWith("seed-colleges.ts") || process.argv[1]?.endsWith("seed-colleges.js")) {
+  seed().catch((err) => {
+    console.error("Seed failed:", err);
+    process.exit(1);
+  });
+}
