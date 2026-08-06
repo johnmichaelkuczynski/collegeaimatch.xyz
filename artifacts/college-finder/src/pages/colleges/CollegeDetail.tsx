@@ -112,10 +112,8 @@ export default function CollegeDetail() {
   // Manually added courses (from the Zhi catalog, added by the rep)
   const [manualCourses, setManualCourses] = React.useState<Course[]>([])
   const [addCourseOpen, setAddCourseOpen] = React.useState(false)
-  const [addCourseName, setAddCourseName] = React.useState('')
+  const [addCourseNames, setAddCourseNames] = React.useState<Set<string>>(new Set())
   const [addCourseSearch, setAddCourseSearch] = React.useState('')
-  const [addCourseEnrollment, setAddCourseEnrollment] = React.useState('')
-  const [addCourseFailRate, setAddCourseFailRate] = React.useState('')
 
   const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
@@ -147,29 +145,29 @@ export default function CollegeDetail() {
   const saveProposal = useCreateProposal()
 
   const handleAddCourse = () => {
-    const entry = ZHI_CATALOG.find(c => c.name === addCourseName)
-    if (!entry) return
-    const enrollment = parseInt(addCourseEnrollment, 10) || 0
-    const failRate = parseFloat(addCourseFailRate) || 0
-    const newCourse: Course = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      id: `manual-${Date.now()}` as any,
-      name: entry.name,
-      subject: entry.subject,
-      description: `${entry.format} Zhi Systems course — added manually`,
-      estimatedEnrollment: enrollment,
-      sections: Math.max(1, Math.ceil(enrollment / 30)),
-      failRate,
-      estimatedAnnualCost: 0,
-      aiInstallCost: 85_000,
-      aiAnnualCost: 18_000,
-      isHighPriority: true,
-    }
-    setManualCourses(prev => [...prev, newCourse])
-    setAddCourseName('')
+    if (addCourseNames.size === 0) return
+    const newCourses: Course[] = []
+    addCourseNames.forEach(name => {
+      const entry = ZHI_CATALOG.find(c => c.name === name)
+      if (!entry) return
+      newCourses.push({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        id: `manual-${Date.now()}-${name}` as any,
+        name: entry.name,
+        subject: entry.subject,
+        description: `${entry.format} Zhi Systems course — added manually`,
+        estimatedEnrollment: 0,
+        sections: 1,
+        failRate: 0,
+        estimatedAnnualCost: 0,
+        aiInstallCost: 85_000,
+        aiAnnualCost: 18_000,
+        isHighPriority: true,
+      })
+    })
+    setManualCourses(prev => [...prev, ...newCourses])
+    setAddCourseNames(new Set())
     setAddCourseSearch('')
-    setAddCourseEnrollment('')
-    setAddCourseFailRate('')
     setAddCourseOpen(false)
   }
 
@@ -997,80 +995,69 @@ export default function CollegeDetail() {
               />
             </div>
 
-            {/* Scrollable course list */}
-            <div className="border rounded-md overflow-y-auto max-h-64 divide-y">
-              {ZHI_CATALOG
-                .filter(c =>
+            {/* Scrollable course list with checkboxes */}
+            <div className="border rounded-md overflow-y-auto max-h-72 divide-y">
+              {(() => {
+                const filtered = ZHI_CATALOG.filter(c =>
                   !addCourseSearch.trim() ||
                   c.name.toLowerCase().includes(addCourseSearch.toLowerCase()) ||
                   c.subject.toLowerCase().includes(addCourseSearch.toLowerCase())
                 )
-                .map(entry => {
+                if (filtered.length === 0) return (
+                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">No courses match "{addCourseSearch}"</div>
+                )
+                return filtered.map(entry => {
                   const alreadyAdded = allCourses.some(c => c.name === entry.name)
+                  const checked = addCourseNames.has(entry.name)
                   return (
-                    <button
+                    <label
                       key={`${entry.name}-${entry.format}`}
-                      className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 text-sm transition-colors
-                        ${addCourseName === entry.name ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/60'}
-                        ${alreadyAdded ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-                      onClick={() => { if (!alreadyAdded) setAddCourseName(entry.name) }}
-                      disabled={alreadyAdded}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors
+                        ${alreadyAdded ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-muted/60'}
+                        ${checked ? 'bg-primary/5' : ''}`}
                     >
-                      <div>
-                        <span>{entry.name}</span>
-                        <span className="block text-xs text-muted-foreground font-normal mt-0.5">{entry.subject}</span>
+                      <Checkbox
+                        checked={checked}
+                        disabled={alreadyAdded}
+                        onCheckedChange={(v) => {
+                          if (alreadyAdded) return
+                          setAddCourseNames(prev => {
+                            const next = new Set(prev)
+                            if (v) next.add(entry.name)
+                            else next.delete(entry.name)
+                            return next
+                          })
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium">{entry.name}</span>
+                        <span className="block text-xs text-muted-foreground mt-0.5">{entry.subject}</span>
                       </div>
                       <Badge variant="outline" className="text-[10px] h-4 px-1.5 shrink-0">
                         {entry.format}
                       </Badge>
-                    </button>
+                    </label>
                   )
                 })
-              }
-              {ZHI_CATALOG.filter(c =>
-                !addCourseSearch.trim() ||
-                c.name.toLowerCase().includes(addCourseSearch.toLowerCase()) ||
-                c.subject.toLowerCase().includes(addCourseSearch.toLowerCase())
-              ).length === 0 && (
-                <div className="px-3 py-6 text-center text-sm text-muted-foreground">No courses match "{addCourseSearch}"</div>
-              )}
+              })()}
             </div>
 
-            {/* Optional enrollment / fail rate */}
-            {addCourseName && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Estimated enrollment (optional)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    className="h-8 text-sm"
-                    placeholder="e.g. 120"
-                    value={addCourseEnrollment}
-                    onChange={(e) => setAddCourseEnrollment(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Fail rate % (optional)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="h-8 text-sm"
-                    placeholder="e.g. 25"
-                    value={addCourseFailRate}
-                    onChange={(e) => setAddCourseFailRate(e.target.value)}
-                  />
-                </div>
-              </div>
+            {/* Selection summary */}
+            {addCourseNames.size > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {addCourseNames.size} course{addCourseNames.size !== 1 ? 's' : ''} selected —{' '}
+                <button className="underline underline-offset-2 hover:text-foreground" onClick={() => setAddCourseNames(new Set())}>
+                  clear all
+                </button>
+              </p>
             )}
           </div>
 
           <DialogFooter className="px-5 py-4 border-t">
             <Button variant="outline" onClick={() => { setAddCourseOpen(false); setAddCourseSearch('') }}>Cancel</Button>
-            <Button onClick={handleAddCourse} disabled={!addCourseName} className="font-semibold">
+            <Button onClick={handleAddCourse} disabled={addCourseNames.size === 0} className="font-semibold">
               <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
-              Add to Course List
+              Add {addCourseNames.size > 0 ? addCourseNames.size : ''} Course{addCourseNames.size !== 1 ? 's' : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
