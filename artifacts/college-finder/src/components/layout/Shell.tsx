@@ -7,6 +7,7 @@ import {
   FileText,
   UserCircle,
   LogOut,
+  LogIn,
   History,
 } from "lucide-react"
 
@@ -25,7 +26,7 @@ const navItems = [
 
 interface ShellProps {
   children: React.ReactNode;
-  user: CurrentUser;
+  user: CurrentUser | null;
 }
 
 export function Shell({ children, user }: ShellProps) {
@@ -39,7 +40,11 @@ export function Shell({ children, user }: ShellProps) {
       credentials: "include",
     })
     queryClient.setQueryData(["currentUser"], null)
-    navigate("/login")
+    navigate("/")
+  }
+
+  const handleSignIn = () => {
+    window.location.href = `${base}/../api/auth/google`
   }
 
   return (
@@ -84,31 +89,49 @@ export function Shell({ children, user }: ShellProps) {
 
         <div className="p-4">
           <div className="rounded-lg bg-sidebar-accent/50 p-4">
-            <div className="flex items-center gap-3">
-              {user.picture ? (
-                <img
-                  src={user.picture}
-                  alt={user.name}
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              ) : (
-                <UserCircle className="h-8 w-8 text-sidebar-foreground/70" />
-              )}
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium">{user.name}</span>
-                <span className="truncate text-xs text-sidebar-foreground/50">
-                  {user.email}
-                </span>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              className="mt-4 w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
-              onClick={handleSignOut}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
+            {user ? (
+              <>
+                <div className="flex items-center gap-3">
+                  {user.picture ? (
+                    <img
+                      src={user.picture}
+                      alt={user.name}
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <UserCircle className="h-8 w-8 text-sidebar-foreground/70" />
+                  )}
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium">{user.name}</span>
+                    <span className="truncate text-xs text-sidebar-foreground/50">
+                      {user.email}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  className="mt-4 w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-sidebar-foreground/50">
+                  Sign in to send proposals
+                </p>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  onClick={handleSignIn}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Sign in with Google
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </aside>

@@ -368,6 +368,20 @@ router.patch("/proposals/:id", async (req, res): Promise<void> => {
   }
 });
 
+// Emails allowed to send proposals (case-insensitive).
+// In development every request is allowed through regardless.
+const ALLOWED_SENDERS = new Set([
+  "johnmichaelkuczynski@gmail.com",
+  "zhi@zhisystems.org",
+]);
+
+function canSend(req: import("express").Request): boolean {
+  if (process.env.NODE_ENV === "development") return true;
+  if (!req.isAuthenticated()) return false;
+  const email = ((req.user as { email?: string })?.email ?? "").toLowerCase();
+  return ALLOWED_SENDERS.has(email);
+}
+
 // ── POST /proposals/:id/email ─────────────────────────────────────────────────
 
 router.post("/proposals/:id/email", async (req, res): Promise<void> => {
@@ -375,6 +389,17 @@ router.post("/proposals/:id/email", async (req, res): Promise<void> => {
   const proposalId = parseInt(raw, 10);
   if (isNaN(proposalId)) {
     res.status(400).json({ error: "Invalid proposal id" });
+    return;
+  }
+
+  // Auth gate — only authorised senders may email proposals
+  if (!canSend(req)) {
+    const status = req.isAuthenticated() ? 403 : 401;
+    res.status(status).json({
+      error: status === 401
+        ? "You must sign in with Google to send proposals."
+        : "Your account is not authorised to send proposals.",
+    });
     return;
   }
 
