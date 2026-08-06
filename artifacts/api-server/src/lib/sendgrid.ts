@@ -1,5 +1,10 @@
 import sgMail from "@sendgrid/mail";
 
+if (!process.env.SENDGRID_API_KEY) {
+  throw new Error("SENDGRID_API_KEY environment variable is not set");
+}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 const FROM_EMAIL = "zhi@zhisystems.org";
 const FROM_NAME = "Douglas Fong · Zhi Systems";
 
