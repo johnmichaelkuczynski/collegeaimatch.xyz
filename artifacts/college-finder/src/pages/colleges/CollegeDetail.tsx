@@ -36,6 +36,18 @@ import { Input } from "@/components/ui/input"
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+// ── Zhi Systems product virtues — shown as selectable chips in the CTA bar ──
+// key: stable identifier used in state; label: short chip text; full: full name
+// passed to the AI prompt so the letter leads with the chosen strengths.
+const ZHI_VIRTUES_LIST: { key: string; label: string; full: string }[] = [
+  { key: "tutors",       label: "24/7 Tutors",         full: "24/7 Built-In Tutors" },
+  { key: "cheatproof",   label: "Cheat-Proof",          full: "Cheat-Proof by Design" },
+  { key: "industry",     label: "Industry-Aligned",     full: "Industry-Aligned Progress" },
+  { key: "adaptive",     label: "Adaptive Lectures",    full: "Fixed Assessments, Adaptive Lectures" },
+  { key: "mastery",      label: "Verified Mastery",     full: "Verified Mastery" },
+  { key: "maintenance",  label: "5-Yr Maintenance",     full: "5-Year Free Maintenance Guarantee" },
+];
+
 // ── Full Zhi Systems course catalog ─────────────────────────────────────────
 // Organised by primary delivery format.  Reps use this to manually add a
 // course to any college's list when they know the college needs it even though

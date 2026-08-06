@@ -13,12 +13,14 @@
     "seed:colleges": "tsx src/seed-colleges.ts"
   },
   "dependencies": {
+    "adm-zip": "^0.6.0",
     "drizzle-orm": "catalog:",
     "drizzle-zod": "^0.8.3",
     "pg": "^8.22.0",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "catalog:",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10"

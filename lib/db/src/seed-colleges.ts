@@ -8,9 +8,10 @@
  */
 
 import { execSync } from "node:child_process";
-import { createReadStream, existsSync, mkdirSync, rmSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import AdmZip from "adm-zip";
 import { db } from "./index";
 import { collegesTable } from "./schema";
 
@@ -147,30 +148,21 @@ async function seedImpl(): Promise<number> {
 
   if (!existsSync(CSV_PATH)) {
     console.log("   Downloading HD2023.zip…");
-    execSync(`curl -sSL --max-time 60 -o "${ZIP_PATH}" "${ZIP_URL}"`, { stdio: "inherit" });
+    execSync(`curl -sSL --max-time 120 -o "${ZIP_PATH}" "${ZIP_URL}"`, { stdio: "inherit" });
     console.log("   Extracting…");
-    execSync(`unzip -o -j "${ZIP_PATH}" "*.csv" -d "${TMP}"`, { stdio: "inherit" });
 
-    // IPEDS ships the file as HD2023_Data_Stata.csv or HD2023.csv
-    const candidates = [
-      join(TMP, "HD2023.csv"),
-      join(TMP, "hd2023.csv"),
-      join(TMP, "HD2023_Data_Stata.csv"),
-    ];
-    let found = false;
-    for (const c of candidates) {
-      if (existsSync(c)) {
-        if (c !== CSV_PATH) execSync(`cp "${c}" "${CSV_PATH}"`);
-        found = true;
-        break;
-      }
+    // Pure-JS extraction — avoids depending on the system `unzip` binary
+    const zip = new AdmZip(ZIP_PATH);
+    const entries = zip.getEntries();
+    const csvEntry = entries.find((e) =>
+      /hd2023.*\.csv$/i.test(e.entryName) || /HD2023.*\.csv$/i.test(e.entryName)
+    );
+    if (!csvEntry) {
+      const names = entries.map((e) => e.entryName).join(", ");
+      throw new Error(`Could not find HD2023 CSV in zip. Found: ${names}`);
     }
-    if (!found) {
-      // List what was extracted
-      const ls = execSync(`ls "${TMP}"`).toString();
-      console.error("Extracted files:", ls);
-      throw new Error("Could not find HD2023 CSV after extraction");
-    }
+    writeFileSync(CSV_PATH, csvEntry.getData());
+    console.log(`   Extracted ${csvEntry.entryName} (${Math.round(csvEntry.getData().length / 1024)} KB)`);
   }
 
   // 2. Parse CSV
