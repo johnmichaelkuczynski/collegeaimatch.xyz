@@ -3,7 +3,7 @@ import { useParams, Link, useLocation } from "wouter"
 import { 
   Building, GraduationCap, MapPin, ExternalLink, AlertTriangle, 
   UserCircle, Mail, Phone, Linkedin, TrendingUp, TrendingDown,
-  ArrowRight, FileText, X, Loader2, Pencil
+  ArrowRight, FileText, X, Loader2, Pencil, PlusCircle, Search, BookOpen
 } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts"
 
@@ -32,8 +32,69 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+// ── Full Zhi Systems course catalog ─────────────────────────────────────────
+// Organised by primary delivery format.  Reps use this to manually add a
+// course to any college's list when they know the college needs it even though
+// the AI didn't flag it.
+const ZHI_CATALOG: { name: string; format: "8-week" | "4-week"; subject: string }[] = [
+  // ── 8-week full courses ──
+  { name: "AI 101",                                 format: "8-week", subject: "Artificial Intelligence" },
+  { name: "Analytic Philosophy",                    format: "8-week", subject: "Philosophy" },
+  { name: "Business Ethics",                        format: "8-week", subject: "Ethics / Business" },
+  { name: "Conceptual Mathematics",                 format: "8-week", subject: "Mathematics" },
+  { name: "Conceptual Physics",                     format: "8-week", subject: "Physics" },
+  { name: "Constructive Critical Reasoning",        format: "8-week", subject: "Philosophy / Logic" },
+  { name: "Critical Thinking",                      format: "8-week", subject: "Philosophy" },
+  { name: "Developmental (Remedial) Mathematics",   format: "8-week", subject: "Mathematics" },
+  { name: "Ethics",                                 format: "8-week", subject: "Philosophy" },
+  { name: "Evolutionary Psychology",                format: "8-week", subject: "Psychology" },
+  { name: "Finance",                                format: "8-week", subject: "Business / Finance" },
+  { name: "Formal Logic",                           format: "8-week", subject: "Philosophy / Logic" },
+  { name: "Know Thyself",                           format: "8-week", subject: "Psychology / Philosophy" },
+  { name: "Math Notation",                          format: "8-week", subject: "Mathematics" },
+  { name: "Philosophy 101",                         format: "8-week", subject: "Philosophy" },
+  { name: "Portfolio Analysis",                     format: "8-week", subject: "Finance" },
+  { name: "Public Speaking",                        format: "8-week", subject: "Communication" },
+  { name: "Quantitative Reasoning",                 format: "8-week", subject: "Mathematics" },
+  { name: "Voice-Powered Know Thyself",             format: "8-week", subject: "Psychology / Philosophy" },
+  // ── 4-week micro courses ──
+  { name: "AI",                                     format: "4-week", subject: "Artificial Intelligence" },
+  { name: "AI Logic",                               format: "4-week", subject: "AI / Logic" },
+  { name: "AI Math",                                format: "4-week", subject: "AI / Mathematics" },
+  { name: "Cognitive Science",                      format: "4-week", subject: "Cognitive Science" },
+  { name: "Computer Systems",                       format: "4-week", subject: "Computer Science" },
+  { name: "Constructive Critical Reasoning",        format: "4-week", subject: "Philosophy / Logic" },
+  { name: "Criminal Psychology",                    format: "4-week", subject: "Psychology" },
+  { name: "Data Structures and Algorithms",         format: "4-week", subject: "Computer Science" },
+  { name: "Databases and SQL",                      format: "4-week", subject: "Computer Science" },
+  { name: "Developmental Psychology",               format: "4-week", subject: "Psychology" },
+  { name: "Diagonalization and Incompleteness",     format: "4-week", subject: "Mathematics / Logic" },
+  { name: "Discrete Math",                          format: "4-week", subject: "Mathematics" },
+  { name: "Evolutionary Psychology",                format: "4-week", subject: "Psychology" },
+  { name: "Financial and Managerial Analytics",     format: "4-week", subject: "Business / Analytics" },
+  { name: "Finite Math",                            format: "4-week", subject: "Mathematics" },
+  { name: "Infinite Series",                        format: "4-week", subject: "Mathematics" },
+  { name: "Introduction to Programming (Python / CS 1)", format: "4-week", subject: "Computer Science" },
+  { name: "IQ Booster",                             format: "4-week", subject: "Cognitive Training" },
+  { name: "Lambda Calculus",                        format: "4-week", subject: "Computer Science / Logic" },
+  { name: "Machine Learning",                       format: "4-week", subject: "Computer Science / AI" },
+  { name: "Marketing Analytics",                    format: "4-week", subject: "Business / Analytics" },
+  { name: "Operations & Supply Chain Analytics",    format: "4-week", subject: "Business / Analytics" },
+  { name: "Personal Finance",                       format: "4-week", subject: "Finance" },
+  { name: "Predictive Analytics",                   format: "4-week", subject: "Business / Analytics" },
+  { name: "Psychodynamic Therapy",                  format: "4-week", subject: "Psychology / Therapy" },
+  { name: "Psychodynamic Therapy of BPD",           format: "4-week", subject: "Psychology / Therapy" },
+  { name: "Psychodynamic Therapy of OCD",           format: "4-week", subject: "Psychology / Therapy" },
+  { name: "Restaurant & Hospitality Analytics",     format: "4-week", subject: "Business / Analytics" },
+  { name: "Revenue Management & Pricing Analytics", format: "4-week", subject: "Business / Analytics" },
+  { name: "Spatial IQ Booster",                     format: "4-week", subject: "Cognitive Training" },
+  { name: "Voice Powered Know Thyself",             format: "4-week", subject: "Psychology / Philosophy" },
+  { name: "Workforce Analytics",                    format: "4-week", subject: "Business / Analytics" },
+];
 
 export default function CollegeDetail() {
   const params = useParams()
@@ -48,6 +109,14 @@ export default function CollegeDetail() {
   const [selectedCourseIdxs, setSelectedCourseIdxs] = React.useState<Set<number>>(new Set())
   const [selectionChartOpen, setSelectionChartOpen] = React.useState(false)
 
+  // Manually added courses (from the Zhi catalog, added by the rep)
+  const [manualCourses, setManualCourses] = React.useState<Course[]>([])
+  const [addCourseOpen, setAddCourseOpen] = React.useState(false)
+  const [addCourseName, setAddCourseName] = React.useState('')
+  const [addCourseSearch, setAddCourseSearch] = React.useState('')
+  const [addCourseEnrollment, setAddCourseEnrollment] = React.useState('')
+  const [addCourseFailRate, setAddCourseFailRate] = React.useState('')
+
   const { data: college, isLoading: isLoadingCollege, isError: isCollegeError, error: collegeError } = useGetCollege(id, {
     query: { enabled: !!id, queryKey: getGetCollegeQueryKey(id) }
   })
@@ -55,6 +124,12 @@ export default function CollegeDetail() {
   const { data: courses, isLoading: isLoadingCourses } = useGetCollegeCourses(id, {}, {
     query: { enabled: !!id, queryKey: getGetCollegeCoursesQueryKey(id, {}) }
   })
+
+  // All courses: AI-generated + manually added by rep (must come after courses hook)
+  const allCourses = React.useMemo<Course[]>(
+    () => [...(courses ?? []), ...manualCourses],
+    [courses, manualCourses]
+  )
   
   const { data: contacts, isLoading: isLoadingContacts } = useGetCollegeContacts(id, {
     query: { enabled: !!id, queryKey: getGetCollegeContactsQueryKey(id) }
@@ -71,10 +146,37 @@ export default function CollegeDetail() {
   const generateProposal = useGenerateProposal()
   const saveProposal = useCreateProposal()
 
+  const handleAddCourse = () => {
+    const entry = ZHI_CATALOG.find(c => c.name === addCourseName)
+    if (!entry) return
+    const enrollment = parseInt(addCourseEnrollment, 10) || 0
+    const failRate = parseFloat(addCourseFailRate) || 0
+    const newCourse: Course = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      id: `manual-${Date.now()}` as any,
+      name: entry.name,
+      subject: entry.subject,
+      description: `${entry.format} Zhi Systems course — added manually`,
+      estimatedEnrollment: enrollment,
+      sections: Math.max(1, Math.ceil(enrollment / 30)),
+      failRate,
+      estimatedAnnualCost: 0,
+      aiInstallCost: 85_000,
+      aiAnnualCost: 18_000,
+      isHighPriority: true,
+    }
+    setManualCourses(prev => [...prev, newCourse])
+    setAddCourseName('')
+    setAddCourseSearch('')
+    setAddCourseEnrollment('')
+    setAddCourseFailRate('')
+    setAddCourseOpen(false)
+  }
+
   const handleGenerateProposal = (singleCourse?: Course, toneOverride?: string, editAfter?: boolean, coursesOverride?: Course[]) => {
     if (!college) return
     const activeTone = toneOverride ?? (tone !== 'manual' ? tone : 'formal')
-    const activeCourses = coursesOverride ?? (singleCourse ? [singleCourse] : courses)
+    const activeCourses = coursesOverride ?? (singleCourse ? [singleCourse] : allCourses)
     const isSubset = !!coursesOverride && !singleCourse
     const generateData = {
       collegeId: college.id,
@@ -131,7 +233,7 @@ export default function CollegeDetail() {
           collegeId: college.id,
           collegeName: college.name,
           collegeState: college.state,
-          courses: courses ?? [],
+          courses: allCourses,
           contacts: contacts ?? [],
           aiVirtues: [],
           outreachLetter: scratchLetter,
@@ -257,7 +359,18 @@ export default function CollegeDetail() {
         <TabsContent value="courses" className="mt-6 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">High-Impact Candidate Courses</h2>
-            <Badge variant="outline">{courses?.length || 0} courses identified</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">{allCourses.length} courses identified</Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-xs gap-1.5"
+                onClick={() => { setAddCourseOpen(true); setAddCourseSearch('') }}
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                Add Course
+              </Button>
+            </div>
           </div>
           
           <Card>
@@ -271,10 +384,10 @@ export default function CollegeDetail() {
                   <TableRow>
                     <TableHead className="w-10 pl-4">
                       <Checkbox
-                        checked={courses.length > 0 && selectedCourseIdxs.size === courses.length}
-                        data-state={selectedCourseIdxs.size > 0 && selectedCourseIdxs.size < courses.length ? "indeterminate" : undefined}
+                        checked={allCourses.length > 0 && selectedCourseIdxs.size === allCourses.length}
+                        data-state={selectedCourseIdxs.size > 0 && selectedCourseIdxs.size < allCourses.length ? "indeterminate" : undefined}
                         onCheckedChange={(checked) => {
-                          if (checked) setSelectedCourseIdxs(new Set(courses.map((_, i) => i)))
+                          if (checked) setSelectedCourseIdxs(new Set(allCourses.map((_, i) => i)))
                           else setSelectedCourseIdxs(new Set())
                         }}
                         aria-label="Select all courses"
@@ -289,7 +402,8 @@ export default function CollegeDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {courses.map((course, i) => {
+                  {allCourses.map((course, i) => {
+                    const isManual = manualCourses.includes(course)
                     const est = estimateCourseCosts(
                       course.estimatedEnrollment ?? 0,
                       (course.failRate ?? 0) / 100,
@@ -298,7 +412,7 @@ export default function CollegeDetail() {
                     return (
                     <TableRow
                       key={i}
-                      className={`cursor-pointer ${course.isHighPriority ? "bg-primary/5" : ""} ${selectedCourseIdxs.has(i) ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
+                      className={`cursor-pointer ${course.isHighPriority && !isManual ? "bg-primary/5" : ""} ${isManual ? "bg-violet-50/60 dark:bg-violet-950/20" : ""} ${selectedCourseIdxs.has(i) ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
                       onClick={() => setSelectedCourseIdxs(prev => {
                         const next = new Set(prev)
                         if (next.has(i)) next.delete(i)
@@ -321,7 +435,10 @@ export default function CollegeDetail() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {course.name}
-                          {course.isHighPriority && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                          {isManual
+                            ? <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-violet-400 text-violet-600 dark:text-violet-400">Manual</Badge>
+                            : course.isHighPriority && <AlertTriangle className="h-3 w-3 text-amber-500" />
+                          }
                         </div>
                         <div className="text-xs text-muted-foreground">{course.subject}</div>
                       </TableCell>
@@ -336,21 +453,32 @@ export default function CollegeDetail() {
                         ) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(est.directCost)}
+                        {isManual ? <span className="text-muted-foreground text-xs italic">—</span> : formatCurrency(est.directCost)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-emerald-600 font-semibold">
                         {formatCurrency(est.zhiAnnual)}
                       </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-xs font-semibold border-primary/40 text-primary hover:bg-primary/10"
-                          onClick={() => setPitchCourse(course)}
-                        >
-                          <FileText className="h-3 w-3 mr-1" />
-                          Pitch
-                        </Button>
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        {isManual ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                            onClick={() => setManualCourses(prev => prev.filter(c => c !== course))}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs font-semibold border-primary/40 text-primary hover:bg-primary/10"
+                            onClick={() => setPitchCourse(course)}
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            Pitch
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                     )
@@ -635,7 +763,7 @@ export default function CollegeDetail() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleGenerateProposal()}
-                    disabled={generateProposal.isPending || !costAnalysis || !courses}
+                    disabled={generateProposal.isPending || !costAnalysis || !allCourses.length}
                   >
                     Full Proposal
                   </Button>
@@ -644,7 +772,7 @@ export default function CollegeDetail() {
                     variant="outline"
                     className="border-emerald-500/50 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
                     onClick={() => setSelectionChartOpen(true)}
-                    disabled={!courses}
+                    disabled={!allCourses.length}
                   >
                     📊 View ROI
                   </Button>
@@ -652,10 +780,10 @@ export default function CollegeDetail() {
                     size="lg"
                     className="font-bold shadow-md"
                     onClick={() => {
-                      const selected = courses!.filter((_, i) => selectedCourseIdxs.has(i))
+                      const selected = allCourses.filter((_, i) => selectedCourseIdxs.has(i))
                       handleGenerateProposal(undefined, undefined, false, selected)
                     }}
-                    disabled={generateProposal.isPending || !costAnalysis || !courses}
+                    disabled={generateProposal.isPending || !costAnalysis || !allCourses.length}
                   >
                     {generateProposal.isPending
                       ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
@@ -666,13 +794,13 @@ export default function CollegeDetail() {
             ) : (
               <>
                 <p className="text-xs text-muted-foreground hidden lg:block">
-                  {courses?.length || 0} courses · check rows to pitch a subset
+                  {allCourses.length} courses · check rows to pitch a subset
                 </p>
                 <Button
                   size="lg"
                   className="font-bold shadow-md"
                   onClick={() => handleGenerateProposal()}
-                  disabled={generateProposal.isPending || !costAnalysis || !courses}
+                  disabled={generateProposal.isPending || !costAnalysis || !allCourses.length}
                 >
                   {generateProposal.isPending
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
@@ -697,7 +825,7 @@ export default function CollegeDetail() {
           </DialogHeader>
 
           {(() => {
-            const selectedCourses = courses?.filter((_, i) => selectedCourseIdxs.has(i)) ?? []
+            const selectedCourses = allCourses.filter((_, i) => selectedCourseIdxs.has(i))
             const perCourse = selectedCourses.map(c => {
               const est = estimateCourseCosts(
                 c.estimatedEnrollment ?? 0,
@@ -830,7 +958,7 @@ export default function CollegeDetail() {
               className="font-bold"
               onClick={() => {
                 setSelectionChartOpen(false)
-                const selected = courses!.filter((_, i) => selectedCourseIdxs.has(i))
+                const selected = allCourses.filter((_, i) => selectedCourseIdxs.has(i))
                 handleGenerateProposal(undefined, undefined, false, selected)
               }}
               disabled={generateProposal.isPending || !costAnalysis}
@@ -838,6 +966,111 @@ export default function CollegeDetail() {
               {generateProposal.isPending
                 ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating…</>
                 : <>Pitch {selectedCourseIdxs.size} Selected <ArrowRight className="ml-2 h-4 w-4" /></>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ADD COURSE FROM ZHI CATALOG DIALOG */}
+      <Dialog open={addCourseOpen} onOpenChange={(v) => { if (!v) { setAddCourseOpen(false); setAddCourseSearch('') } }}>
+        <DialogContent className="max-w-lg p-0 gap-0">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-primary" />
+              Add Course from Zhi Catalog
+            </DialogTitle>
+            <DialogDescription>
+              Add a course you know this college needs, even if the AI didn't flag it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-5 py-4 space-y-4">
+            {/* Search filter */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-8 h-9 text-sm"
+                placeholder="Search courses…"
+                value={addCourseSearch}
+                onChange={(e) => setAddCourseSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {/* Scrollable course list */}
+            <div className="border rounded-md overflow-y-auto max-h-64 divide-y">
+              {ZHI_CATALOG
+                .filter(c =>
+                  !addCourseSearch.trim() ||
+                  c.name.toLowerCase().includes(addCourseSearch.toLowerCase()) ||
+                  c.subject.toLowerCase().includes(addCourseSearch.toLowerCase())
+                )
+                .map(entry => {
+                  const alreadyAdded = allCourses.some(c => c.name === entry.name)
+                  return (
+                    <button
+                      key={`${entry.name}-${entry.format}`}
+                      className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 text-sm transition-colors
+                        ${addCourseName === entry.name ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/60'}
+                        ${alreadyAdded ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                      onClick={() => { if (!alreadyAdded) setAddCourseName(entry.name) }}
+                      disabled={alreadyAdded}
+                    >
+                      <div>
+                        <span>{entry.name}</span>
+                        <span className="block text-xs text-muted-foreground font-normal mt-0.5">{entry.subject}</span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 shrink-0">
+                        {entry.format}
+                      </Badge>
+                    </button>
+                  )
+                })
+              }
+              {ZHI_CATALOG.filter(c =>
+                !addCourseSearch.trim() ||
+                c.name.toLowerCase().includes(addCourseSearch.toLowerCase()) ||
+                c.subject.toLowerCase().includes(addCourseSearch.toLowerCase())
+              ).length === 0 && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">No courses match "{addCourseSearch}"</div>
+              )}
+            </div>
+
+            {/* Optional enrollment / fail rate */}
+            {addCourseName && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Estimated enrollment (optional)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="h-8 text-sm"
+                    placeholder="e.g. 120"
+                    value={addCourseEnrollment}
+                    onChange={(e) => setAddCourseEnrollment(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Fail rate % (optional)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="h-8 text-sm"
+                    placeholder="e.g. 25"
+                    value={addCourseFailRate}
+                    onChange={(e) => setAddCourseFailRate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-5 py-4 border-t">
+            <Button variant="outline" onClick={() => { setAddCourseOpen(false); setAddCourseSearch('') }}>Cancel</Button>
+            <Button onClick={handleAddCourse} disabled={!addCourseName} className="font-semibold">
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+              Add to Course List
             </Button>
           </DialogFooter>
         </DialogContent>
