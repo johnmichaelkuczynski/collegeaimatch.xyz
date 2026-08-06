@@ -152,7 +152,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
     };
   }
 
-  const parsed = CreateProposalBody.safeParse(req.body);
+  const parsed = GenerateProposalBody.safeParse(bodyForParse);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
