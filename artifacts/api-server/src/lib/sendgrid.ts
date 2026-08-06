@@ -3,78 +3,53 @@ import sgMail from "@sendgrid/mail";
 const FROM_EMAIL = "zhi@zhisystems.org";
 const FROM_NAME = "Douglas Fong · Zhi Systems";
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY ?? "");
-
-interface CourseSummary {
-  name?: string | null;
-  failRate?: number | null;
-  estimatedAnnualCost?: number | null;
-  aiAnnualCost?: number | null;
+interface CourseRow {
+  name: string;
+  estimatedEnrollment?: number;
+  failRate?: number;
+  estimatedAnnualCost?: number;
+  aiAnnualCost?: number;
 }
-
-interface CostAnalysisSummary {
-  totalCurrentAnnualCost?: number;
-  totalAiAnnualCost?: number;
-  totalAiInstallCost?: number;
-  savingsAnnual?: number;
-}
-
 export interface SendProposalEmailParams {
   to: string;
+
   recipientName?: string;
+
   collegeName: string;
+
   outreachLetter: string;
+
   proposalId?: number;
+
   emailLogId?: string;
-  courses?: CourseSummary[] | null;
-  costAnalysis?: CostAnalysisSummary | null;
+
+  costAnalysis?: CostAnalysisData | null;
   /** Selected virtue strings from the proposal — used to reorder feature cards. Empty = default order. */
   aiVirtues?: string[] | null;
 }
 
-const fmt = (n: number) =>
-  "$" + Math.round(n).toLocaleString("en-US");
+function fmt(n: number): string {
+  return "$" + Math.round(n).toLocaleString("en-US");
+}
+/** Compact ROI summary: tiles + comparison bar chart + per-course savings bars + detail table */
+function buildRoiTable(costAnalysis: CostAnalysisData): string {
+  const courses = (costAnalysis.courses ?? []).filter((c) => c.name);
+  if (courses.length === 0) return "";
 
-function buildRoiTable(
-  courses: CourseSummary[],
-  costAnalysis: CostAnalysisSummary
-): string {
-  const rows = courses
-    .filter((c) => c.name)
-    .map((c) => {
-      const current = c.estimatedAnnualCost ?? 0;
-      const ai = c.aiAnnualCost ?? 18_000;
-      const saves = current - ai;
-      const failRateHtml =
-        (c.failRate ?? 0) > 20
-          ? `<span style="color:#dc2626;font-weight:600;">${c.failRate}%</span>`
-          : c.failRate
-          ? `${c.failRate}%`
-          : "—";
-      return `
-        <tr style="border-top:1px solid #e5e7eb;">
-          <td style="padding:5px 10px;font-size:11px;color:#1f2937;">${c.name}</td>
-          <td style="padding:5px 10px;font-size:11px;text-align:center;">${failRateHtml}</td>
-          <td style="padding:5px 10px;font-size:11px;text-align:right;font-family:monospace;">${current > 0 ? fmt(current) : "—"}</td>
-          <td style="padding:5px 10px;font-size:11px;text-align:right;font-family:monospace;color:#16a34a;">${fmt(ai)}</td>
-          <td style="padding:5px 10px;font-size:11px;text-align:right;font-family:monospace;font-weight:700;color:#16a34a;">${saves > 0 ? fmt(saves) : "—"}</td>
-        </tr>`;
-    })
-    .join("");
-
-  const courseData = courses.filter((c) => c.name).map((c) => ({
+  const courseData = courses.map((c) => ({
     name: c.name!,
     current: c.estimatedAnnualCost ?? 0,
     ai: c.aiAnnualCost ?? 18_000,
     saves: (c.estimatedAnnualCost ?? 0) - (c.aiAnnualCost ?? 18_000),
+    failRate: c.failRate,
   }));
-  const totalCurrent = courseData.reduce((s, c) => s + c.current, 0);
-  const totalAi      = courseData.reduce((s, c) => s + c.ai, 0);
-  const totalSaves   = totalCurrent - totalAi;
+
+  const totalCurrent = costAnalysis.totalCurrentAnnualCost ?? courseData.reduce((s, c) => s + c.current, 0);
+  const totalAi      = costAnalysis.totalAiAnnualCost ?? courseData.reduce((s, c) => s + c.ai, 0);
+  const totalSaves   = costAnalysis.savingsAnnual ?? (totalCurrent - totalAi);
   const setupCost    = costAnalysis.totalAiInstallCost ?? 0;
   const maxSaves     = Math.max(...courseData.map((c) => c.saves), 1);
 
-  // ── HTML bar helper (compact) ─────────────────────────────────────────────
   const bar = (value: number, max: number, color: string) => {
     const pct = Math.round((value / max) * 100);
     return `<table width="100%" cellpadding="0" cellspacing="0" style="height:14px;">
@@ -85,7 +60,6 @@ function buildRoiTable(
     </table>`;
   };
 
-  // ── Comparison chart rows ─────────────────────────────────────────────────
   const comparisonRows = `
     <tr>
       <td style="padding:4px 10px 2px;font-size:11px;color:#374151;white-space:nowrap;width:100px;">Current Costs</td>
@@ -98,7 +72,6 @@ function buildRoiTable(
       <td style="padding:2px 10px 4px;font-size:11px;font-family:monospace;color:#16a34a;text-align:right;">${fmt(totalAi)}</td>
     </tr>`;
 
-  // ── Per-course savings bar rows ───────────────────────────────────────────
   const savingsBarRows = courseData
     .filter((c) => c.saves > 0)
     .map((c) => `
@@ -108,12 +81,24 @@ function buildRoiTable(
       <td style="padding:2px 10px;font-size:10px;font-family:monospace;font-weight:700;color:#16a34a;white-space:nowrap;text-align:right;">${fmt(c.saves)}</td>
     </tr>`).join("");
 
+  const detailRows = courseData.map((c) => {
+    const failRateHtml =
+      (c.failRate ?? 0) > 20
+        ? `<span style="color:#dc2626;font-weight:600;">${c.failRate}%</span>`
+        : c.failRate != null ? `${c.failRate}%` : "—";
+    return `
+      <tr style="border-top:1px solid #e5e7eb;">
+        <td style="padding:5px 10px;font-size:11px;color:#1f2937;">${c.name}</td>
+        <td style="padding:5px 10px;font-size:11px;text-align:center;">${failRateHtml}</td>
+        <td style="padding:5px 10px;font-size:11px;text-align:right;font-family:monospace;">${c.current > 0 ? fmt(c.current) : "—"}</td>
+        <td style="padding:5px 10px;font-size:11px;text-align:right;font-family:monospace;color:#16a34a;">${fmt(c.ai)}</td>
+        <td style="padding:5px 10px;font-size:11px;text-align:right;font-family:monospace;font-weight:700;color:#16a34a;">${c.saves > 0 ? fmt(c.saves) : "—"}</td>
+      </tr>`;
+  }).join("");
+
   return `
-  <!-- ROI Analysis -->
   <table width="100%" cellpadding="0" cellspacing="0"
     style="border:1px solid #e5e7eb;border-radius:8px;margin:0 0 28px 0;overflow:hidden;font-family:sans-serif;">
-
-    <!-- Header -->
     <tr>
       <td colspan="5" style="background:#f9fafb;padding:10px 14px;border-bottom:1px solid #e5e7eb;">
         <span style="font-size:12px;font-weight:700;color:#374151;letter-spacing:0.03em;">
@@ -121,8 +106,6 @@ function buildRoiTable(
         </span>
       </td>
     </tr>
-
-    <!-- Summary tiles -->
     <tr>
       <td colspan="2" style="padding:12px 14px;background:#fff7f7;text-align:center;border-right:1px solid #e5e7eb;">
         <div style="font-size:10px;color:#6b7280;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;">Current Annual Cost</div>
@@ -138,24 +121,16 @@ function buildRoiTable(
         <div style="font-size:17px;font-weight:700;color:#16a34a;font-family:monospace;">${fmt(totalSaves)}</div>
       </td>
     </tr>
-
-    <!-- Comparison bar chart + per-course savings side by side -->
     <tr>
       <td colspan="3" style="padding:10px 0 6px;border-top:1px solid #e5e7eb;vertical-align:top;width:50%;">
-        <div style="padding:0 10px;font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">
-          Current Burden vs. AI Integration
-        </div>
+        <div style="padding:0 10px;font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Current Burden vs. AI Integration</div>
         <table width="100%" cellpadding="0" cellspacing="0">${comparisonRows}</table>
       </td>
       <td colspan="2" style="padding:10px 0 6px;border-top:1px solid #e5e7eb;border-left:1px solid #f3f4f6;vertical-align:top;width:50%;">
-        <div style="padding:0 10px;font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">
-          Annual Savings per Course
-        </div>
+        <div style="padding:0 10px;font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Annual Savings per Course</div>
         <table width="100%" cellpadding="0" cellspacing="0">${savingsBarRows}</table>
       </td>
     </tr>
-
-    <!-- Table header -->
     <tr style="background:#f3f4f6;border-top:1px solid #e5e7eb;">
       <td style="padding:6px 10px;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Course</td>
       <td style="padding:6px 10px;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;text-align:center;">Fail Rate</td>
@@ -163,8 +138,7 @@ function buildRoiTable(
       <td style="padding:6px 10px;font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;text-align:right;">AI/yr</td>
       <td style="padding:6px 10px;font-size:10px;font-weight:600;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;text-align:right;">Saves/yr</td>
     </tr>
-    ${rows}
-    <!-- Total row -->
+    ${detailRows}
     <tr style="border-top:2px solid #d1fae5;background:#f0fdf4;font-weight:700;">
       <td colspan="2" style="padding:7px 10px;font-size:11px;color:#1f2937;">Total</td>
       <td style="padding:7px 10px;font-size:11px;text-align:right;font-family:monospace;">${fmt(totalCurrent)}</td>
@@ -172,6 +146,70 @@ function buildRoiTable(
       <td style="padding:7px 10px;font-size:11px;text-align:right;font-family:monospace;color:#16a34a;">${fmt(totalSaves)}</td>
     </tr>
   </table>`;
+}
+
+/** Per-course savings detail table with enrollment column — task 25 contribution */
+function buildSavingsTable(costAnalysis: CostAnalysisData): string {
+  const courses = costAnalysis.courses ?? [];
+  if (courses.length === 0) return "";
+
+  const rowsHtml = courses
+    .map((c, i) => {
+      const current = c.estimatedAnnualCost ?? 0;
+      const ai = c.aiAnnualCost ?? current * 0.15;
+      const saves = current - ai;
+      const bg = i % 2 === 0 ? "#ffffff" : "#f9fafb";
+      const failRateHtml =
+        (c.failRate ?? 0) > 20
+          ? `<span style="color:#dc2626;font-weight:600;">${c.failRate}%</span>`
+          : c.failRate != null ? `${c.failRate}%` : "—";
+      return `
+        <tr style="background:${bg};">
+          <td style="padding:10px 14px;font-family:Georgia,serif;font-size:14px;color:#1f2937;border-bottom:1px solid #e5e7eb;">${c.name}</td>
+          <td style="padding:10px 14px;font-family:sans-serif;font-size:13px;color:#4b5563;text-align:center;border-bottom:1px solid #e5e7eb;">${c.estimatedEnrollment != null ? c.estimatedEnrollment.toLocaleString("en-US") : "—"}</td>
+          <td style="padding:10px 14px;font-family:sans-serif;font-size:13px;text-align:center;border-bottom:1px solid #e5e7eb;">${failRateHtml}</td>
+          <td style="padding:10px 14px;font-family:sans-serif;font-size:13px;color:#4b5563;text-align:right;border-bottom:1px solid #e5e7eb;">${fmt(current)}</td>
+          <td style="padding:10px 14px;font-family:sans-serif;font-size:13px;color:#4b5563;text-align:right;border-bottom:1px solid #e5e7eb;">${fmt(ai)}</td>
+          <td style="padding:10px 14px;font-family:sans-serif;font-size:13px;color:#166534;font-weight:600;text-align:right;border-bottom:1px solid #e5e7eb;">${fmt(saves)}</td>
+        </tr>`;
+    })
+    .join("\n");
+
+  const totalCurrent =
+    costAnalysis.totalCurrentAnnualCost ??
+    courses.reduce((s, c) => s + (c.estimatedAnnualCost ?? 0), 0);
+  const totalAi =
+    costAnalysis.totalAiAnnualCost ??
+    courses.reduce((s, c) => s + (c.aiAnnualCost ?? (c.estimatedAnnualCost ?? 0) * 0.15), 0);
+  const totalSaves = costAnalysis.savingsAnnual ?? totalCurrent - totalAi;
+  const setupCost = costAnalysis.totalAiInstallCost ?? 0;
+
+  return `
+    <h3 style="margin:32px 0 8px;font-family:sans-serif;letter-spacing:0.05em;font-size:12px;text-transform:uppercase;color:#6b7280;">Savings Breakdown by Course</h3>
+    ${setupCost ? `<p style="margin:0 0 12px;font-family:sans-serif;font-size:12px;color:#6b7280;">Annual savings shown below. One-time setup: ${fmt(setupCost)}.</p>` : ""}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;font-size:13px;">
+      <thead>
+        <tr style="background:#f3f4f6;">
+          <th style="padding:10px 14px;text-align:left;font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-bottom:2px solid #e5e7eb;">Course</th>
+          <th style="padding:10px 14px;text-align:center;font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-bottom:2px solid #e5e7eb;">Enrollment</th>
+          <th style="padding:10px 14px;text-align:center;font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-bottom:2px solid #e5e7eb;">Fail Rate</th>
+          <th style="padding:10px 14px;text-align:right;font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-bottom:2px solid #e5e7eb;">Current Cost</th>
+          <th style="padding:10px 14px;text-align:right;font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-bottom:2px solid #e5e7eb;">Zhi AI Cost</th>
+          <th style="padding:10px 14px;text-align:right;font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;border-bottom:2px solid #e5e7eb;">Annual Savings</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+      <tfoot>
+        <tr style="background:#f0fdf4;">
+          <td colspan="3" style="padding:12px 14px;font-family:sans-serif;font-size:13px;font-weight:700;color:#1f2937;border-top:2px solid #d1fae5;">Total</td>
+          <td style="padding:12px 14px;font-family:sans-serif;font-size:13px;font-weight:700;color:#1f2937;text-align:right;border-top:2px solid #d1fae5;">${fmt(totalCurrent)}</td>
+          <td style="padding:12px 14px;font-family:sans-serif;font-size:13px;font-weight:700;color:#1f2937;text-align:right;border-top:2px solid #d1fae5;">${fmt(totalAi)}</td>
+          <td style="padding:12px 14px;font-family:sans-serif;font-size:13px;font-weight:700;color:#166534;text-align:right;border-top:2px solid #d1fae5;">${fmt(totalSaves)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
 }
 
 function orderVirtueCards(
@@ -205,7 +243,7 @@ function orderVirtueCards(
   return [...selected, ...unselected, ...maintenance];
 }
 export async function sendProposalEmail(params: SendProposalEmailParams): Promise<void> {
-  const { to, recipientName, collegeName, outreachLetter, courses, costAnalysis, aiVirtues } = params;
+  const { to, recipientName, collegeName, outreachLetter, costAnalysis, aiVirtues } = params;
 
   // Strip markdown bold markers that sometimes leak through
   const cleanLetter = outreachLetter.replace(/\*\*/g, "");
@@ -233,9 +271,15 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
     })
     .join("\n");
 
-  // Build ROI table if course data is available
-  const hasCourseData = courses && courses.length > 0 && costAnalysis;
-  const roiTableHtml = hasCourseData ? buildRoiTable(courses, costAnalysis) : "";
+  // ROI summary chart (compact tiles + bar charts + detail table) — shown first
+  const roiTableHtml = costAnalysis && (costAnalysis.courses?.length ?? 0) > 0
+    ? buildRoiTable(costAnalysis)
+    : "";
+
+  // Per-course savings breakdown table (includes enrollment column) — shown after letter
+  const savingsTableHtml = costAnalysis && (costAnalysis.courses?.length ?? 0) > 0
+    ? buildSavingsTable(costAnalysis)
+    : "";
 
   // Zhi Systems feature showcase — reorder so selected virtues appear first
   const baseVirtues = [
@@ -282,7 +326,6 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
 <head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
 <body style="background:#f3f4f6;margin:0;padding:24px 16px;font-family:sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;margin:0 auto;">
-    <!-- Zhi Systems header -->
     <tr>
       <td style="background:#111827;padding:18px 28px;border-radius:8px 8px 0 0;">
         <p style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.5px;">Zhi Systems</p>
@@ -295,11 +338,14 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
     <tr>
       <td style="background:#ffffff;padding:28px 28px 36px;border-radius:0 0 8px 8px;">
 
-        <!-- ROI charts first — compact, same proportions -->
+        <!-- ROI summary chart — compact visual first -->
         ${roiTableHtml}
 
-        <!-- Letter body — 13pt font, 1.35 line-height -->
+        <!-- Letter body -->
         ${bodyHtml}
+
+        <!-- Savings breakdown table with enrollment -->
+        ${savingsTableHtml}
 
         <!-- Why Zhi Systems -->
         ${virtuesHtml}
@@ -333,4 +379,13 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
         }
       : {}),
   });
+}
+
+interface CostAnalysisData {
+  courses?: CourseRow[];
+  totalCurrentAnnualCost?: number;
+  totalAiAnnualCost?: number;
+  totalAiInstallCost?: number;
+  savingsAnnual?: number;
+  savingsYear1?: number;
 }

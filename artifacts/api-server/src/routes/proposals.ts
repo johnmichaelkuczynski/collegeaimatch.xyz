@@ -48,7 +48,11 @@ router.get("/proposals/email-history", async (_req, res): Promise<void> => {
       .select({
         id: proposalsTable.id,
         collegeName: proposalsTable.collegeName,
+        collegeState: proposalsTable.collegeState,
+        courses: proposalsTable.courses,
         emailLog: proposalsTable.emailLog,
+        createdAt: proposalsTable.createdAt,
+        updatedAt: proposalsTable.updatedAt,
       })
       .from(proposalsTable)
       .orderBy(desc(proposalsTable.createdAt));
