@@ -284,20 +284,24 @@ router.post("/proposals", async (req, res): Promise<void> => {
   const input = parsed.data;
 
   try {
-    const [proposal] = await db
-      .select()
-      .from(proposalsTable)
-      .where(eq(proposalsTable.id, proposalId));
+    const [created] = await db
+      .insert(proposalsTable)
+      .values({
+        collegeId: input.collegeId ?? null,
+        collegeName: input.collegeName,
+        collegeState: input.collegeState,
+        courses: (input.courses ?? []) as object[],
+        contacts: (input.contacts ?? []) as object[],
+        aiVirtues: (input.aiVirtues ?? []) as object[],
+        outreachLetter: input.outreachLetter,
+        costAnalysis: input.costAnalysis as object,
+      })
+      .returning();
 
-    if (!proposal) {
-      res.status(404).json({ error: "Proposal not found" });
-      return;
-    }
-
-    res.json(proposal);
+    res.status(201).json(created);
   } catch (err) {
-    req.log.error({ err }, "Get proposal failed");
-    res.status(500).json({ error: "Failed to get proposal" });
+    req.log.error({ err }, "Create proposal failed");
+    res.status(500).json({ error: "Failed to create proposal" });
   }
 });
 
