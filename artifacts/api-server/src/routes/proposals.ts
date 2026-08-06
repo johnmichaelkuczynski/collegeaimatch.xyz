@@ -305,13 +305,13 @@ router.post("/proposals", async (req, res): Promise<void> => {
   }
 });
 
-// ── PATCH /proposals/:id — update outreach letter ─────────────────────────────
+// ── GET /proposals/:id ───────────────────────────────────────────────────────
 
-router.patch("/proposals/:id", async (req, res): Promise<void> => {
+router.get("/proposals/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = DeleteProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid proposal id" });
     return;
   }
 
@@ -319,7 +319,7 @@ router.patch("/proposals/:id", async (req, res): Promise<void> => {
     const [proposal] = await db
       .select()
       .from(proposalsTable)
-      .where(eq(proposalsTable.id, proposalId));
+      .where(eq(proposalsTable.id, id));
 
     if (!proposal) {
       res.status(404).json({ error: "Proposal not found" });
@@ -333,7 +333,7 @@ router.patch("/proposals/:id", async (req, res): Promise<void> => {
   }
 });
 
-// ── PATCH /proposals/:id — update outreach letter ─────────────────────────────
+// ── PATCH /proposals/:id — update outreach letter ────────────────────────────
 
 router.patch("/proposals/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
