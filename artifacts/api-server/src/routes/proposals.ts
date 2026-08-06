@@ -148,7 +148,7 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
     };
   }
 
-  const parsed = GenerateProposalBody.safeParse(bodyForParse);
+  const parsed = CreateProposalBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
@@ -198,15 +198,15 @@ router.post("/proposals/generate", async (req, res): Promise<void> => {
         savingsAnnual: nums.savingsVsTrue,
       };
       // Use generateOutreachLetter so tone is respected in pitch mode too
-      const outreachLetter = await generateOutreachLetter({
-        college: collegeInfo,
-        courses,
-        contacts: [],
-        aiVirtues: input.aiVirtues ?? [],
-        costAnalysis: pitchCostAnalysis,
-        tone,
-        subset: false,
-      });
+    const outreachLetter = await generateOutreachLetter({
+      college: collegeInfo,
+      courses,
+      contacts: contacts.map((c) => ({ ...c, institution: input.collegeName })),
+      aiVirtues: input.aiVirtues ?? [],
+      costAnalysis,
+      tone,
+      subset,
+    });
       res.json({
         outreachLetter,
         costAnalysis: { collegeName: input.collegeName, courses, ...pitchCostAnalysis },
@@ -281,30 +281,27 @@ router.post("/proposals", async (req, res): Promise<void> => {
 
   try {
     const [proposal] = await db
-      .insert(proposalsTable)
-      .values({
-        collegeName: input.collegeName,
-        collegeState: input.collegeState,
-        courses: input.courses ?? [],
-        contacts: input.contacts ?? [],
-        aiVirtues: input.aiVirtues ?? [],
-        outreachLetter: input.outreachLetter ?? "",
-        costAnalysis: input.costAnalysis ?? null,
-      })
-      .returning();
+      .select()
+      .from(proposalsTable)
+      .where(eq(proposalsTable.id, proposalId));
 
-    res.status(201).json(proposal);
+    if (!proposal) {
+      res.status(404).json({ error: "Proposal not found" });
+      return;
+    }
+
+    res.json(proposal);
   } catch (err) {
-    req.log.error({ err }, "Create proposal failed");
-    res.status(500).json({ error: "Failed to create proposal" });
+    req.log.error({ err }, "Get proposal failed");
+    res.status(500).json({ error: "Failed to get proposal" });
   }
 });
 
-// ── GET /proposals/:id ────────────────────────────────────────────────────────
+// ── PATCH /proposals/:id — update outreach letter ─────────────────────────────
 
-router.get("/proposals/:id", async (req, res): Promise<void> => {
+router.patch("/proposals/:id", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
+  const params = DeleteProposalParams.safeParse({ proposalId: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -314,7 +311,7 @@ router.get("/proposals/:id", async (req, res): Promise<void> => {
     const [proposal] = await db
       .select()
       .from(proposalsTable)
-      .where(eq(proposalsTable.id, params.data.proposalId));
+      .where(eq(proposalsTable.id, proposalId));
 
     if (!proposal) {
       res.status(404).json({ error: "Proposal not found" });

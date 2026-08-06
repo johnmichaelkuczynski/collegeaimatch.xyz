@@ -108,6 +108,25 @@ export default function CollegeDetail() {
   const [scratchSaving, setScratchSaving] = React.useState(false)
   const [selectedCourseIdxs, setSelectedCourseIdxs] = React.useState<Set<number>>(new Set())
   const [selectionChartOpen, setSelectionChartOpen] = React.useState(false)
+  // Virtue selection — keys from ZHI_VIRTUES_LIST; empty means "use all five" (default)
+  const [selectedVirtueKeys, setSelectedVirtueKeys] = React.useState<Set<string>>(new Set())
+
+  const toggleVirtue = (key: string) => {
+    setSelectedVirtueKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else if (next.size < 3) {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
+  // Derive the aiVirtues strings to send — empty array means "all five" on the server
+  const activeAiVirtues = selectedVirtueKeys.size > 0
+    ? ZHI_VIRTUES_LIST.filter(v => selectedVirtueKeys.has(v.key)).map(v => v.full)
+    : []
 
   // Manually added courses (from the Zhi catalog, added by the rep)
   const [manualCourses, setManualCourses] = React.useState<Course[]>([])
@@ -189,6 +208,7 @@ export default function CollegeDetail() {
       contacts: contacts,
       costAnalysis: costAnalysis,
       tone: activeTone,
+      aiVirtues: activeAiVirtues,
       ...(singleCourse ? { pitchMode: true } : {}),
       ...(isSubset ? { subset: true } : {}),
     }
@@ -205,7 +225,7 @@ export default function CollegeDetail() {
                 collegeState: college.state,
                 courses: generated.prioritizedCourses,
                 contacts: contacts ?? [],
-                aiVirtues: [],
+                aiVirtues: activeAiVirtues,
                 outreachLetter: generated.outreachLetter,
                 costAnalysis: generated.costAnalysis,
               },
@@ -233,7 +253,7 @@ export default function CollegeDetail() {
           collegeState: college.state,
           courses: allCourses,
           contacts: contacts ?? [],
-          aiVirtues: [],
+          aiVirtues: activeAiVirtues,
           outreachLetter: scratchLetter,
           costAnalysis: costAnalysis,
         },
@@ -683,8 +703,44 @@ export default function CollegeDetail() {
         </TabsContent>
       </Tabs>
 
-      {/* CTA FOOTER — tone selector + proposal generation */}
+      {/* CTA FOOTER — virtue selector + tone + proposal generation */}
       <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-background/95 backdrop-blur-md border-t z-10 shadow-lg">
+        {/* Virtue emphasis row */}
+        <div className="flex items-center gap-2 px-4 pt-2.5 pb-1 border-b border-border/50 flex-wrap">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Lead with:</span>
+          {ZHI_VIRTUES_LIST.map(v => {
+            const isSelected = selectedVirtueKeys.has(v.key)
+            const isDisabled = !isSelected && selectedVirtueKeys.size >= 3
+            return (
+              <button
+                key={v.key}
+                onClick={() => toggleVirtue(v.key)}
+                disabled={isDisabled}
+                className={[
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : isDisabled
+                    ? "bg-muted text-muted-foreground border-border opacity-40 cursor-not-allowed"
+                    : "bg-background text-foreground border-border hover:bg-muted cursor-pointer",
+                ].join(" ")}
+                title={isDisabled ? "Select up to 3 virtues" : v.full}
+              >
+                {v.label}
+              </button>
+            )
+          })}
+          {selectedVirtueKeys.size > 0 ? (
+            <button
+              onClick={() => setSelectedVirtueKeys(new Set())}
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground ml-1"
+            >
+              Reset
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground/60 italic ml-1">all five (default)</span>
+          )}
+        </div>
         <div className="flex items-center justify-between gap-3 px-4 py-3 flex-wrap">
           {/* Tone selector */}
           <div className="flex items-center gap-2.5 min-w-0">

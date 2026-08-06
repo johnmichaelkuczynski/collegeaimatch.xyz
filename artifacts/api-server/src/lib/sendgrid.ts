@@ -28,6 +28,8 @@ export interface SendProposalEmailParams {
   emailLogId?: string;
   courses?: CourseSummary[] | null;
   costAnalysis?: CostAnalysisSummary | null;
+  /** Selected virtue strings from the proposal — used to reorder feature cards. Empty = default order. */
+  aiVirtues?: string[] | null;
 }
 
 const fmt = (n: number) =>
@@ -172,8 +174,38 @@ function buildRoiTable(
   </table>`;
 }
 
+function orderVirtueCards(
+  virtues: Array<{ icon: string; title: string; body: string }>,
+  aiVirtues: string[]
+): Array<{ icon: string; title: string; body: string }> {
+  if (!aiVirtues || aiVirtues.length === 0) return virtues;
+
+  // Keyword fingerprints to match aiVirtues strings against card titles
+  const KEYWORDS: Record<string, string[]> = {
+    "24/7 Built-In Tutors":             ["24/7"],
+    "Cheat-Proof by Design":            ["cheat-proof", "cheat proof"],
+    "Industry-Aligned Progress":        ["industry-aligned"],
+    "Fixed Assessments, Adaptive Lectures": ["fixed assessments", "adaptive lectures"],
+    "Verified Mastery":                 ["verified mastery"],
+    "5-Year Free Maintenance Guarantee": [], // never matched; always stays at end
+  };
+
+  const lowerVirtues = aiVirtues.map((v) => v.toLowerCase());
+
+  const isSelected = (title: string) => {
+    const kws = KEYWORDS[title] ?? [];
+    return kws.some((k) => lowerVirtues.some((v) => v.includes(k)));
+  };
+
+  // Maintenance guarantee always goes last; selected virtues bubble to top
+  const maintenance = virtues.filter((v) => v.title === "5-Year Free Maintenance Guarantee");
+  const rest = virtues.filter((v) => v.title !== "5-Year Free Maintenance Guarantee");
+  const selected = rest.filter((v) => isSelected(v.title));
+  const unselected = rest.filter((v) => !isSelected(v.title));
+  return [...selected, ...unselected, ...maintenance];
+}
 export async function sendProposalEmail(params: SendProposalEmailParams): Promise<void> {
-  const { to, recipientName, collegeName, outreachLetter, courses, costAnalysis } = params;
+  const { to, recipientName, collegeName, outreachLetter, courses, costAnalysis, aiVirtues } = params;
 
   // Strip markdown bold markers that sometimes leak through
   const cleanLetter = outreachLetter.replace(/\*\*/g, "");
@@ -205,8 +237,8 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
   const hasCourseData = courses && courses.length > 0 && costAnalysis;
   const roiTableHtml = hasCourseData ? buildRoiTable(courses, costAnalysis) : "";
 
-  // Zhi Systems feature showcase — always included
-  const virtues = [
+  // Zhi Systems feature showcase — reorder so selected virtues appear first
+  const baseVirtues = [
     { icon: "🕐", title: "24/7 Built-In Tutors", body: "Every student has on-demand, personalized instruction — eliminating the access gap that stalls most online learning." },
     { icon: "🔒", title: "Cheat-Proof by Design", body: "Assessments cannot be gamed, so course completion actually certifies competence employers can rely on." },
     { icon: "📈", title: "Industry-Aligned Progress", body: "Advancement is benchmarked to professional standards, making the credential something hiring managers trust." },
@@ -214,6 +246,7 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
     { icon: "✅", title: "Verified Mastery", body: "Adaptation never dilutes standards — retention and mastery are confirmed, not assumed." },
     { icon: "🛡️", title: "5-Year Free Maintenance Guarantee", body: "The one-time setup fee locks in five full years of platform maintenance at no additional cost — zero budget surprises." },
   ];
+  const virtues = orderVirtueCards(baseVirtues, aiVirtues ?? []);
   const virtueCards = virtues.map((v) => `
     <tr>
       <td width="36" style="padding:10px 6px 10px 14px;vertical-align:top;font-size:20px;">${v.icon}</td>
