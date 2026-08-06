@@ -12,6 +12,8 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useQueryClient } from "@tanstack/react-query"
+import type { CurrentUser } from "@/hooks/useCurrentUser"
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,8 +23,24 @@ const navItems = [
   { href: "/email-history", label: "Email History", icon: History },
 ]
 
-export function Shell({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation()
+interface ShellProps {
+  children: React.ReactNode;
+  user: CurrentUser;
+}
+
+export function Shell({ children, user }: ShellProps) {
+  const [location, navigate] = useLocation()
+  const queryClient = useQueryClient()
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "")
+
+  const handleSignOut = async () => {
+    await fetch(`${base}/../api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    })
+    queryClient.setQueryData(["currentUser"], null)
+    navigate("/login")
+  }
 
   return (
     <div className="flex min-h-[100dvh] w-full bg-background font-sans">
@@ -67,17 +85,26 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="p-4">
           <div className="rounded-lg bg-sidebar-accent/50 p-4">
             <div className="flex items-center gap-3">
-              <UserCircle className="h-8 w-8 text-sidebar-foreground/70" />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">Alex Morgan</span>
-                <span className="text-xs text-sidebar-foreground/50">
-                  Sales Director
+              {user.picture ? (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              ) : (
+                <UserCircle className="h-8 w-8 text-sidebar-foreground/70" />
+              )}
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">{user.name}</span>
+                <span className="truncate text-xs text-sidebar-foreground/50">
+                  {user.email}
                 </span>
               </div>
             </div>
             <Button
               variant="ghost"
               className="mt-4 w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              onClick={handleSignOut}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
@@ -88,7 +115,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 pl-64">
-        {/* Header / Topbar - if needed */}
         <div className="p-8">
           {children}
         </div>

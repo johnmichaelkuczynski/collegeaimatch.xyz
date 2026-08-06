@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
 import collegesRouter from "./colleges";
 import subjectsRouter from "./subjects";
 import proposalsRouter from "./proposals";
@@ -9,6 +10,7 @@ import webhooksRouter from "./webhooks";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
 router.use(collegesRouter);
 router.use(subjectsRouter);
 router.use(proposalsRouter);

@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import ReadMe from './pages/ReadMe';
+import Login from './pages/Login';
 import { Toaster } from '@/components/ui/toaster';
 import NotFound from '@/pages/not-found';
 import { Shell } from '@/components/layout/Shell';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 import Dashboard from '@/pages/Dashboard';
 import CollegeSearch from '@/pages/colleges/CollegeSearch';
@@ -15,9 +17,23 @@ import EmailHistory from '@/pages/email-history/EmailHistory';
 
 const queryClient = new QueryClient();
 
-function Router() {
+function AuthedRoutes() {
+  const { data: user, isLoading } = useCurrentUser();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
   return (
-    <Shell>
+    <Shell user={user}>
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/colleges" component={CollegeSearch} />
@@ -33,11 +49,23 @@ function Router() {
   );
 }
 
+function Router() {
+  return (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route>
+        <AuthedRoutes />
+      </Route>
+    </Switch>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <Router />
+        <Toaster />
       </WouterRouter>
     </QueryClientProvider>
   );
