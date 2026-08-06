@@ -253,28 +253,58 @@ export async function sendProposalEmail(params: SendProposalEmailParams): Promis
   // Strip markdown bold markers that sometimes leak through
   const cleanLetter = outreachLetter.replace(/\*\*/g, "");
 
-  // Convert the plain-text letter to a clean HTML version
-  // 13pt font, compact line-height (1.35) per user spec
-  const bodyHtml = cleanLetter
-    .split("\n")
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return `<div style="height:6px;"></div>`;
-      // Section headers (### markdown or ALL CAPS lines)
-      if (trimmed.startsWith("###")) {
-        const text = trimmed.replace(/^###\s*/, "");
-        return `<h3 style="margin:16px 0 4px;font-family:sans-serif;letter-spacing:0.04em;font-size:11px;text-transform:uppercase;color:#6b7280;">${text}</h3>`;
-      }
-      if (trimmed === trimmed.toUpperCase() && trimmed.length > 4 && !/^\d/.test(trimmed)) {
-        return `<h3 style="margin:16px 0 4px;font-family:sans-serif;letter-spacing:0.04em;font-size:11px;text-transform:uppercase;color:#6b7280;">${trimmed}</h3>`;
-      }
-      // Bullet / numbered list items — slightly indented
-      if (/^[-•]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
-        return `<p style="margin:0 0 5px 14px;font-family:Georgia,serif;font-size:13pt;line-height:1.35;color:#1f2937;">${trimmed}</p>`;
-      }
-      return `<p style="margin:0 0 7px;font-family:Georgia,serif;font-size:13pt;line-height:1.35;color:#1f2937;">${trimmed}</p>`;
-    })
-    .join("\n");
+  // Convert the plain-text letter to a clean HTML version.
+  // The letter starts with a letterhead block (sender info, date, recipient
+  // address) before the "Dear …" salutation.  That block is rendered in a
+  // smaller, tighter style; then a generous gap separates it from the body.
+  const lines = cleanLetter.split("\n");
+  const dearIdx = lines.findIndex((l) => /^\s*dear\s+/i.test(l.trim()));
+
+  const renderBodyLine = (line: string): string => {
+    const trimmed = line.trim();
+    if (!trimmed) return `<div style="height:6px;"></div>`;
+    if (trimmed.startsWith("###")) {
+      const text = trimmed.replace(/^###\s*/, "");
+      return `<h3 style="margin:16px 0 4px;font-family:sans-serif;letter-spacing:0.04em;font-size:11px;text-transform:uppercase;color:#6b7280;">${text}</h3>`;
+    }
+    if (trimmed === trimmed.toUpperCase() && trimmed.length > 4 && !/^\d/.test(trimmed)) {
+      return `<h3 style="margin:16px 0 4px;font-family:sans-serif;letter-spacing:0.04em;font-size:11px;text-transform:uppercase;color:#6b7280;">${trimmed}</h3>`;
+    }
+    if (/^[-•]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed)) {
+      return `<p style="margin:0 0 5px 14px;font-family:Georgia,serif;font-size:13pt;line-height:1.35;color:#1f2937;">${trimmed}</p>`;
+    }
+    return `<p style="margin:0 0 7px;font-family:Georgia,serif;font-size:13pt;line-height:1.35;color:#1f2937;">${trimmed}</p>`;
+  };
+
+  let bodyHtml: string;
+  if (dearIdx > 0) {
+    // Letterhead block — small font, single-spaced, no extra paragraph gaps
+    const headerHtml = lines
+      .slice(0, dearIdx)
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return ""; // collapse blank lines in the header
+        return `<p style="margin:0;font-family:Georgia,serif;font-size:10.5pt;line-height:1.25;color:#374151;">${trimmed}</p>`;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    // "Dear …" line and everything after — normal body styling with extra top gap
+    const dearLine = lines[dearIdx].trim();
+    const afterDear = lines
+      .slice(dearIdx + 1)
+      .map(renderBodyLine)
+      .join("\n");
+
+    bodyHtml =
+      headerHtml +
+      `\n<div style="height:28px;"></div>\n` +
+      `<p style="margin:0 0 7px;font-family:Georgia,serif;font-size:13pt;line-height:1.35;color:#1f2937;">${dearLine}</p>\n` +
+      afterDear;
+  } else {
+    // No recognisable letterhead — fall back to the original rendering
+    bodyHtml = lines.map(renderBodyLine).join("\n");
+  }
 
   // ROI summary chart (compact tiles + bar charts + detail table) — shown first
   const roiTableHtml = costAnalysis && (costAnalysis.courses?.length ?? 0) > 0
