@@ -40,6 +40,52 @@ function parseEmailLog(raw: unknown): EmailLogEntry[] {
   return raw as EmailLogEntry[];
 }
 
+// ── GET /proposals/email-history ─────────────────────────────────────────────
+
+router.get("/proposals/email-history", async (_req, res): Promise<void> => {
+  try {
+    const proposals = await db
+      .select({
+        id: proposalsTable.id,
+        collegeName: proposalsTable.collegeName,
+        emailLog: proposalsTable.emailLog,
+      })
+      .from(proposalsTable)
+      .orderBy(desc(proposalsTable.createdAt));
+
+    const entries: {
+      proposalId: number;
+      collegeName: string;
+      sentAt: string;
+      to: string;
+      recipientName?: string;
+    }[] = [];
+
+    for (const proposal of proposals) {
+      const log = parseEmailLog(proposal.emailLog);
+      for (const entry of log) {
+        entries.push({
+          proposalId: proposal.id,
+          collegeName: proposal.collegeName,
+          sentAt: entry.sentAt,
+          to: entry.to,
+          ...(entry.recipientName ? { recipientName: entry.recipientName } : {}),
+        });
+      }
+    }
+
+    // Sort by most recent send first
+    entries.sort(
+      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+    );
+
+    res.json(entries);
+  } catch (err) {
+    _req.log.error({ err }, "List email history failed");
+    res.status(500).json({ error: "Failed to list email history" });
+  }
+});
+
 // ── GET /proposals ────────────────────────────────────────────────────────────
 
 router.get("/proposals", async (_req, res): Promise<void> => {

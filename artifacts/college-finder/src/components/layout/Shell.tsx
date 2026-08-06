@@ -7,6 +7,7 @@ import {
   FileText,
   UserCircle,
   LogOut,
+  History,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -17,6 +18,7 @@ const navItems = [
   { href: "/colleges", label: "Colleges", icon: School },
   { href: "/subjects", label: "Subjects", icon: BookOpen },
   { href: "/proposals", label: "Proposals", icon: FileText },
+  { href: "/email-history", label: "Email History", icon: History },
 ]
 
 export function Shell({ children }: { children: React.ReactNode }) {

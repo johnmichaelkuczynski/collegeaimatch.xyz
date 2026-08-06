@@ -11,6 +11,7 @@ import CollegeDetail from '@/pages/colleges/CollegeDetail';
 import SubjectSearch from '@/pages/subjects/SubjectSearch';
 import ProposalsList from '@/pages/proposals/ProposalsList';
 import ProposalDetail from '@/pages/proposals/ProposalDetail';
+import EmailHistory from '@/pages/email-history/EmailHistory';
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/subjects" component={SubjectSearch} />
         <Route path="/proposals" component={ProposalsList} />
         <Route path="/proposals/:id" component={ProposalDetail} />
+        <Route path="/email-history" component={EmailHistory} />
         <Route path="/readme" component={ReadMe} />
         <Route component={NotFound} />
       </Switch>
